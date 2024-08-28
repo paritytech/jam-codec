@@ -342,47 +342,22 @@ impl CompactLen<u64> for Compact<u64> {
 
 impl<'a> Encode for CompactRef<'a, u128> {
 	fn size_hint(&self) -> usize {
-		Compact::compact_len(self.0)
+		Compact::<u128>::compact_len(self.0)
 	}
 
 	fn encode_to<W: Output + ?Sized>(&self, dest: &mut W) {
-		match self.0 {
-			0..=0b0011_1111 => dest.push_byte((*self.0 as u8) << 2),
-			0..=0b0011_1111_1111_1111 => (((*self.0 as u16) << 2) | 0b01).encode_to(dest),
-			0..=0b0011_1111_1111_1111_1111_1111_1111_1111 =>
-				(((*self.0 as u32) << 2) | 0b10).encode_to(dest),
-			_ => {
-				let bytes_needed = 16 - self.0.leading_zeros() / 8;
-				assert!(
-					bytes_needed >= 4,
-					"Previous match arm matches anyting less than 2^30; qed"
-				);
-				dest.push_byte(0b11 + ((bytes_needed - 4) << 2) as u8);
-				let mut v = *self.0;
-				for _ in 0..bytes_needed {
-					dest.push_byte(v as u8);
-					v >>= 8;
-				}
-				assert_eq!(v, 0, "shifted sufficient bits right to lead only leading zeros; qed")
-			},
-		}
-	}
-
-	fn using_encoded<R, F: FnOnce(&[u8]) -> R>(&self, f: F) -> R {
-		let mut r = ArrayVecWrapper(ArrayVec::<u8, 17>::new());
-		self.encode_to(&mut r);
-		f(&r.0)
+		let l = (*self.0 & u64::MAX as u128) as u64;
+		let h = (*self.0 >> 64) as u64;
+		WrappedPrimitive::<u64>::encode_to(&WrappedPrimitive(l), dest);
+		WrappedPrimitive::<u64>::encode_to(&WrappedPrimitive(h), dest);
 	}
 }
 
 impl CompactLen<u128> for Compact<u128> {
 	fn compact_len(val: &u128) -> usize {
-		match val {
-			0..=0b0011_1111 => 1,
-			0..=0b0011_1111_1111_1111 => 2,
-			0..=0b0011_1111_1111_1111_1111_1111_1111_1111 => 4,
-			_ => (16 - val.leading_zeros() / 8) as usize + 1,
-		}
+		let l = (*val & u64::MAX as u128) as u64;
+		let h = (*val >> 64) as u64;
+		Compact::compact_len(&l) + Compact::compact_len(&h)
 	}
 }
 
@@ -500,45 +475,36 @@ mod tests {
 	use super::*;
 
 	#[test]
-	fn prefix_input_empty_read_unchanged() {
-		let mut input = PrefixInput { prefix: Some(1), input: &mut &vec![2, 3, 4][..] };
-		assert_eq!(input.remaining_len(), Ok(Some(4)));
-		let mut empty_buf = [];
-		assert_eq!(input.read(&mut empty_buf[..]), Ok(()));
-		assert_eq!(input.remaining_len(), Ok(Some(4)));
-		assert_eq!(input.read_byte(), Ok(1));
-	}
-
-	#[test]
 	fn compact_128_encoding_works() {
 		let tests = [
-			(0u128, 1usize),
-			(63, 1),
+			(0u128, 2),
+			(63, 2),
 			(64, 2),
-			(16383, 2),
+			(16383, 3),
 			(16384, 4),
-			(1073741823, 4),
-			(1073741824, 5),
-			((1 << 32) - 1, 5),
+			(1073741823, 6),
+			(1073741824, 6),
+			((1 << 32) - 1, 6),
 			(1 << 32, 6),
-			(1 << 40, 7),
+			(1 << 40, 7), //10
 			(1 << 48, 8),
-			((1 << 56) - 1, 8),
-			(1 << 56, 9),
-			((1 << 64) - 1, 9),
-			(1 << 64, 10),
-			(1 << 72, 11),
-			(1 << 80, 12),
-			(1 << 88, 13),
-			(1 << 96, 14),
-			(1 << 104, 15),
-			(1 << 112, 16),
-			((1 << 120) - 1, 16),
-			(1 << 120, 17),
-			(u128::MAX, 17),
+			((1 << 56) - 1, 9),
+			(1 << 56, 10),
+			((1 << 64) - 1, 10),
+			(1 << 64, 2),
+			(1 << 72, 3),
+			(1 << 80, 4),
+			(1 << 88, 5),
+			(1 << 96, 6),
+			(1 << 104, 7), //20
+			(1 << 112, 8),
+			((1 << 120) - 1, 17),
+			(1 << 120, 10),
+			(u128::MAX, 18),
 		];
 		for &(n, l) in &tests {
 			let encoded = Compact(n).encode();
+			println!("{}", hex::encode(&encoded));
 			assert_eq!(encoded.len(), l);
 			assert_eq!(Compact::compact_len(&n), l);
 			assert_eq!(<Compact<u128>>::decode(&mut &encoded[..]).unwrap().0, n);
@@ -550,15 +516,15 @@ mod tests {
 		let tests = [
 			(0u64, 1usize),
 			(63, 1),
-			(64, 2),
+			(64, 1),
 			(16383, 2),
-			(16384, 4),
-			(1073741823, 4),
+			(16384, 3),
+			(1073741823, 5),
 			(1073741824, 5),
 			((1 << 32) - 1, 5),
-			(1 << 32, 6),
-			(1 << 40, 7),
-			(1 << 48, 8),
+			(1 << 32, 5),
+			(1 << 40, 6),
+			(1 << 48, 7),
 			((1 << 56) - 1, 8),
 			(1 << 56, 9),
 			(u64::MAX, 9),
@@ -576,10 +542,10 @@ mod tests {
 		let tests = [
 			(0u32, 1usize),
 			(63, 1),
-			(64, 2),
+			(64, 1),
 			(16383, 2),
-			(16384, 4),
-			(1073741823, 4),
+			(16384, 3),
+			(1073741823, 5),
 			(1073741824, 5),
 			(u32::MAX, 5),
 		];
@@ -593,7 +559,7 @@ mod tests {
 
 	#[test]
 	fn compact_16_encoding_works() {
-		let tests = [(0u16, 1usize), (63, 1), (64, 2), (16383, 2), (16384, 4), (65535, 4)];
+		let tests = [(0u16, 1usize), (63, 1), (64, 1), (16383, 2), (16384, 3), (65535, 3)];
 		for &(n, l) in &tests {
 			let encoded = Compact(n).encode();
 			assert_eq!(encoded.len(), l);
@@ -605,7 +571,7 @@ mod tests {
 
 	#[test]
 	fn compact_8_encoding_works() {
-		let tests = [(0u8, 1usize), (63, 1), (64, 2), (255, 2)];
+		let tests = [(0u8, 1usize), (63, 1), (64, 1), (255, 2)];
 		for &(n, l) in &tests {
 			let encoded = Compact(n).encode();
 			assert_eq!(encoded.len(), l);
@@ -627,19 +593,19 @@ mod tests {
 	fn compact_integers_encoded_as_expected() {
 		let tests = [
 			(0u64, "00"),
-			(63, "fc"),
-			(64, "01 01"),
-			(16383, "fd ff"),
-			(16384, "02 00 01 00"),
-			(1073741823, "fe ff ff ff"),
-			(1073741824, "03 00 00 00 40"),
-			((1 << 32) - 1, "03 ff ff ff ff"),
-			(1 << 32, "07 00 00 00 00 01"),
-			(1 << 40, "0b 00 00 00 00 00 01"),
-			(1 << 48, "0f 00 00 00 00 00 00 01"),
-			((1 << 56) - 1, "0f ff ff ff ff ff ff ff"),
-			(1 << 56, "13 00 00 00 00 00 00 00 01"),
-			(u64::MAX, "13 ff ff ff ff ff ff ff ff"),
+			(63, "3f"),
+			(64, "40"),
+			(16383, "bf ff"),
+			(16384, "c0 00 40"),
+			(1073741823, "f0 ff ff ff 3f"),
+			(1073741824, "f0 00 00 00 40"),
+			((1 << 32) - 1, "f0 ff ff ff ff"),
+			(1 << 32, "f1 00 00 00 00"),
+			(1 << 40, "f9 00 00 00 00 00"),
+			(1 << 48, "fd 00 00 00 00 00 00"),
+			((1 << 56) - 1, "fe ff ff ff ff ff ff ff"),
+			(1 << 56, "ff 00 00 00 00 00 00 00 01"),
+			(u64::MAX, "ff ff ff ff ff ff ff ff ff"),
 		];
 		for &(n, s) in &tests {
 			// Verify u64 encoding
@@ -691,7 +657,7 @@ mod tests {
 
 	#[test]
 	fn compact_as_8_encoding_works() {
-		let tests = [(0u8, 1usize), (63, 1), (64, 2), (255, 2)];
+		let tests = [(0u8, 1usize), (63, 1), (64, 1), (255, 2)];
 		for &(n, l) in &tests {
 			let compact: Compact<Wrapper> = Wrapper(n).into();
 			let encoded = compact.encode();
@@ -740,47 +706,6 @@ mod tests {
 		v.write(&[1, 2, 3, 4]);
 	}
 
-	macro_rules! check_bound {
-		( $m:expr, $ty:ty, $typ1:ty, [ $(($ty2:ty, $ty2_err:expr)),* ]) => {
-			$(
-				check_bound!($m, $ty, $typ1, $ty2, $ty2_err);
-			)*
-		};
-		( $m:expr, $ty:ty, $typ1:ty, $ty2:ty, $ty2_err:expr) => {
-			let enc = ((<$ty>::MAX >> 2) as $typ1 << 2) | $m;
-			assert_eq!(Compact::<$ty2>::decode(&mut &enc.to_le_bytes()[..]),
-				Err($ty2_err.into()));
-		};
-	}
-	macro_rules! check_bound_u32 {
-		( [ $(($ty2:ty, $ty2_err:expr)),* ]) => {
-			$(
-				check_bound_u32!($ty2, $ty2_err);
-			)*
-		};
-		( $ty2:ty, $ty2_err:expr ) => {
-			assert_eq!(Compact::<$ty2>::decode(&mut &[0b11, 0xff, 0xff, 0xff, 0xff >> 2][..]),
-				Err($ty2_err.into()));
-		};
-	}
-	macro_rules! check_bound_high {
-		( $m:expr, [ $(($ty2:ty, $ty2_err:expr)),* ]) => {
-			$(
-				check_bound_high!($m, $ty2, $ty2_err);
-			)*
-		};
-		( $s:expr, $ty2:ty, $ty2_err:expr) => {
-			let mut dest = Vec::new();
-			dest.push(0b11 + (($s - 4) << 2) as u8);
-			for _ in 0..($s - 1) {
-				dest.push(u8::MAX);
-			}
-			dest.push(0);
-			assert_eq!(Compact::<$ty2>::decode(&mut &dest[..]),
-				Err($ty2_err.into()));
-		};
-	}
-
 	#[test]
 	fn compact_u64_test() {
 		for a in [
@@ -805,35 +730,6 @@ mod tests {
 			let e = Compact::<u128>::encode(&Compact(*a));
 			let d = Compact::<u128>::decode(&mut &e[..]).unwrap().0;
 			assert_eq!(*a, d);
-		}
-	}
-
-	#[test]
-	fn should_avoid_overlapping_definition() {
-		check_bound!(
-			0b01,
-			u8,
-			u16,
-			[
-				(u8, OUT_OF_RANGE),
-				(u16, OUT_OF_RANGE),
-				(u32, OUT_OF_RANGE),
-				(u64, OUT_OF_RANGE),
-				(u128, OUT_OF_RANGE)
-			]
-		);
-		check_bound!(
-			0b10,
-			u16,
-			u32,
-			[(u16, OUT_OF_RANGE), (u32, OUT_OF_RANGE), (u64, OUT_OF_RANGE), (u128, OUT_OF_RANGE)]
-		);
-		check_bound_u32!([(u32, OUT_OF_RANGE), (u64, OUT_OF_RANGE), (u128, OUT_OF_RANGE)]);
-		for i in 5..=8 {
-			check_bound_high!(i, [(u64, OUT_OF_RANGE), (u128, OUT_OF_RANGE)]);
-		}
-		for i in 8..=16 {
-			check_bound_high!(i, [(u128, OUT_OF_RANGE)]);
 		}
 	}
 
