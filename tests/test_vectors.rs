@@ -65,18 +65,64 @@ enum TestEnum<T> {
 	Bar([T; 8]),
 }
 
-fn process<T: Encode + Decode + std::fmt::Debug + PartialEq>(v: T) {
-	println!("-------------------------------");
-	println!("[{}]", std::any::type_name::<T>());
-	// dbg!(&v);
-	let b = v.encode();
-	println!("{}", hex::encode(&b));
-	let d = T::decode(&mut &b[..]).unwrap();
-	assert_eq!(v, d);
+#[derive(Default)]
+struct TestHarness {
+	dump: Vec<u8>,
+}
+
+impl TestHarness {
+	fn new() -> Self {
+		Self::default()
+	}
+
+	fn process<T: Encode + Decode + std::fmt::Debug + PartialEq>(&mut self, v: T) {
+		println!("-------------------------------");
+		println!("[{:#?}]", std::any::type_name::<T>());
+		let buf = v.encode();
+		println!("{}", hex::encode(&buf));
+		self.dump.extend_from_slice(&buf[..]);
+		let d = T::decode(&mut &buf[..]).unwrap();
+		assert_eq!(v, d);
+	}
+
+	fn process_bit_string_vl(&mut self, bit_string: &str) {
+		let buf = Compact(bit_string.len() as u64).encode();
+		print!("{}", hex::encode(&buf));
+		self.dump.extend_from_slice(&buf[..]);
+		self.process_bit_string_fl(bit_string);
+	}
+
+	// Bits represented by the bits string are processed left to right in groups of 8 bits.
+	// Examples:
+	// * "1101" ≡ 0x0b
+	// * "10001011 01101" ≡
+
+	fn process_bit_string_fl(&mut self, bit_string: &str) {
+		let mut buf = Vec::with_capacity((bit_string.len() + 7) / 8);
+		bit_string.as_bytes().chunks(8).for_each(|chunk| {
+			let octet = chunk.iter().enumerate().fold(0, |octet, (i, &bit)| {
+				let b = (bit == b'1') as u8;
+				octet | (b << i)
+			});
+			buf.push_byte(octet);
+		});
+		println!("{}", hex::encode(&buf));
+		self.dump.extend_from_slice(&buf[..]);
+	}
+}
+
+const DUMP_FILE: &str = "vectors.bin";
+
+impl Drop for TestHarness {
+	fn drop(&mut self) {
+		use std::{fs::File, io::Write};
+		let mut file = File::create(DUMP_FILE).unwrap();
+		file.write_all(&self.dump).unwrap()
+	}
 }
 
 #[test]
-fn gen_vectors() {
+fn make_vectors() {
 	// Sequences in different flavors
 	// NOTE: In the end everything can be once of these three types:
 	// - A primitive integer
@@ -85,12 +131,14 @@ fn gen_vectors() {
 	// - A uniform variable length sequence (aka a vector)
 	// - An "choice" (aka an enum)
 
+	let mut t = TestHarness::new();
+
 	// Non-uniform fixed length sequence
 
-	process(seq!(0xf1_u8, 0x1234_u16, 0xFF00cc11_u32, 0x1231092319023131_u64));
+	t.process(seq!(0xf1_u8, 0x1234_u16, 0xFF00cc11_u32, 0x1231092319023131_u64));
 
 	#[rustfmt::skip]
-	process(seq!{
+	t.process(seq!{
 		0xf1_u8,
 		seq!{
 			seq!{
@@ -109,29 +157,29 @@ fn gen_vectors() {
 
 	// Uniform fixed length sequences
 
-	process([0_u8; 0]);
-	process([(3_u8, 0x3122_u16), (8, 0x3321), (9, 0x9973)]);
-	process(TryInto::<[u8; 16]>::try_into(myvec![0_u8 => 16].shuffle()).unwrap());
+	t.process([0_u8; 0]);
+	t.process([(3_u8, 0x3122_u16), (8, 0x3321), (9, 0x9973)]);
+	t.process(TryInto::<[u8; 16]>::try_into(myvec![0_u8 => 16].shuffle()).unwrap());
 
 	// Uniform variable length sequences
 
-	process(myvec![1_u16, 2, 3]);
-	process(myvec!(0_u16 => 127));
-	process(myvec!(0_u8 => 200));
+	t.process(myvec![1_u16, 2, 3]);
+	t.process(myvec!(0_u16 => 127));
+	t.process(myvec!(0_u8 => 200));
 
 	// Enumerations
 
-	process(TestEnum::<u8>::Dummy);
-	process(TestEnum::Foo(42_u8));
-	process(TestEnum::Bar([1_u8, 2, 3, 4, 5, 6, 7, 8]));
+	t.process(TestEnum::<u8>::Dummy);
+	t.process(TestEnum::Foo(42_u8));
+	t.process(TestEnum::Bar([1_u8, 2, 3, 4, 5, 6, 7, 8]));
 
 	// Optional entries
 
-	process(Option::<u16>::None);
-	process(Some(42_u8));
+	t.process(Option::<u16>::None);
+	t.process(Some(42_u8));
 
 	#[rustfmt::skip]
-	process(
+	t.process(
 		myvec!(0 => 15).shuffle().iter().map(|&i|
 			if i % 3 == 0 {
 				Option::None
@@ -142,7 +190,7 @@ fn gen_vectors() {
 	);
 
 	#[rustfmt::skip]
-	process(seq! {
+	t.process(seq! {
 		(Option::Some(0x1234_u16), 42_u8),
 		myvec!(0 => 15).shuffle().iter().map(|&i|
 			(
@@ -159,7 +207,7 @@ fn gen_vectors() {
 	// A mix of the above
 
 	#[rustfmt::skip]
-	process(
+	t.process(
 		myvec!(0 => 10).shuffle().iter().map(|&i|
 			seq!{
 				i as u16,
@@ -173,7 +221,7 @@ fn gen_vectors() {
 	);
 
 	#[rustfmt::skip]
-	process(seq! {
+	t.process(seq! {
 		3_u8,
 		seq! {
 			0x5242_u16,
@@ -185,64 +233,43 @@ fn gen_vectors() {
 
 	// Some compact values
 
-	process(Compact(0_u32));
-	process(Compact(127_u32));
-	process(Compact(128_u32));
-	process(Compact(1023_u32));
-	process(Compact(0x1000_u32));
-	process(Compact(0x3fff_u32));
-	process(Compact(0x4000_u32));
-	process(Compact(0xfff1_u32));
-	process(Compact(0x1fffff_u32));
-	process(Compact(0x200000_u32));
-	process(Compact(0xfff1ff_u32));
-	process(Compact(0xffffffffff_u64));
-	process(Compact(0xab1c50bbc19a_u64));
+	t.process(Compact(0_u32));
+	t.process(Compact(127_u32));
+	t.process(Compact(128_u32));
+	t.process(Compact(129_u32));
+	t.process(Compact(1023_u32));
+	t.process(Compact(0x1000_u32));
+	t.process(Compact(0x3fff_u32));
+	t.process(Compact(0x4000_u32));
+	t.process(Compact(0x4001_u32));
+	t.process(Compact(0xfff1_u32));
+	t.process(Compact(0x1fffff_u32));
+	t.process(Compact(0x200000_u32));
+	t.process(Compact(0x200001_u32));
+	t.process(Compact(0xfff1ff_u32));
+	t.process(Compact(0xffffffffff_u64));
+	t.process(Compact(0xab1c50bbc19a_u64));
 
 	// Bit string
 	println!("------------------------");
 	println!("Fixed-length bit-strings");
-	let bits = vec![0].iter().map(|&b| b != 0).collect::<Vec<_>>();
-	println!("{}", hex::encode(bit_string_encode_fl(&bits)));
-	let bits = vec![0, 0, 0].iter().map(|&b| b != 0).collect::<Vec<_>>();
-	println!("{}", hex::encode(bit_string_encode_fl(&bits)));
-	let bits = vec![1].iter().map(|&b| b != 0).collect::<Vec<_>>();
-	println!("{}", hex::encode(bit_string_encode_fl(&bits)));
-	let bits = vec![1, 1, 0, 1].iter().map(|&b| b != 0).collect::<Vec<_>>();
-	println!("{}", hex::encode(bit_string_encode_fl(&bits)));
-	let bits = vec![0, 0, 1, 1, 0, 0, 1, 1, 0, 1].iter().map(|&b| b != 0).collect::<Vec<_>>();
-	println!("{}", hex::encode(bit_string_encode_fl(&bits)));
+
+	t.process_bit_string_fl("0");
+	t.process_bit_string_fl("000");
+	t.process_bit_string_fl("1");
+	t.process_bit_string_fl("1101");
+	t.process_bit_string_fl("101100001001");
+	t.process_bit_string_fl("100010110110100101101101");
+	t.process_bit_string_fl("010100101010010101010101010110101000100101011010101011010101101101001010110101010010101010101101011010111001001000110010101010010110101001110011111110100000000010101010010111101001001111100010000001010110110101011001010101011111111110101101");
 
 	println!("------------------------");
 	println!("Variable-length bit-strings");
-	let bits = vec![0].iter().map(|&b| b != 0).collect::<Vec<_>>();
-	println!("{}", hex::encode(bit_string_encode_vl(&bits)));
-	let bits = vec![0, 0, 0].iter().map(|&b| b != 0).collect::<Vec<_>>();
-	println!("{}", hex::encode(bit_string_encode_vl(&bits)));
-	let bits = vec![1].iter().map(|&b| b != 0).collect::<Vec<_>>();
-	println!("{}", hex::encode(bit_string_encode_vl(&bits)));
-	let bits = vec![1, 0, 1, 1].iter().map(|&b| b != 0).collect::<Vec<_>>();
-	println!("{}", hex::encode(bit_string_encode_vl(&bits)));
-	let bits = vec![1, 0, 1, 1, 0, 1, 1, 1, 0, 1].iter().map(|&b| b != 0).collect::<Vec<_>>();
-	println!("{}", hex::encode(bit_string_encode_vl(&bits)));
-	let bits = vec![0, 1, 0, 1, 1, 1].iter().map(|&b| b != 0).collect::<Vec<_>>();
-	println!("{}", hex::encode(bit_string_encode_vl(&bits)));
-}
 
-fn bit_string_encode_vl(bit_string: &[bool]) -> Vec<u8> {
-	let mut buf = Compact(bit_string.len() as u64).encode();
-	bit_string.chunks(8).for_each(|chunk| {
-		let o = chunk.iter().enumerate().fold(0, |octet, (i, &bit)| octet | ((bit as u8) << i));
-		buf.push_byte(o);
-	});
-	buf
-}
-
-fn bit_string_encode_fl(bit_string: &[bool]) -> Vec<u8> {
-	let mut buf = Vec::with_capacity((bit_string.len() + 7) / 8);
-	bit_string.chunks(8).for_each(|chunk| {
-		let o = chunk.iter().enumerate().fold(0, |octet, (i, &bit)| octet | ((bit as u8) << i));
-		buf.push_byte(o);
-	});
-	buf
+	t.process_bit_string_vl("0");
+	t.process_bit_string_vl("000");
+	t.process_bit_string_vl("1");
+	t.process_bit_string_vl("1101");
+	t.process_bit_string_vl("101100001001");
+	t.process_bit_string_vl("100010110110100101101101");
+	t.process_bit_string_vl("010100101010010101010101010110101000100101011010101011010101101101001010110101010010101010101101011010111001001000110010101010010110101001110011111110100000000010101010010111101001001111100010000001010110110101011001010101011111111110101101");
 }
