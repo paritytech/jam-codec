@@ -16,8 +16,6 @@
 
 use arrayvec::ArrayVec;
 
-#[cfg(feature = "max-encoded-len")]
-use crate::MaxEncodedLen;
 use crate::{
 	alloc::vec::Vec,
 	codec::{Decode, Encode, EncodeAsRef, Input, Output},
@@ -221,18 +219,6 @@ where
 	CompactRef<'a, T>: Encode + From<&'a T>,
 {
 	type RefType = CompactRef<'a, T>;
-}
-
-#[cfg(feature = "max-encoded-len")]
-impl<T> MaxEncodedLen for Compact<T>
-where
-	T: CompactAs,
-	Compact<T::As>: MaxEncodedLen,
-	Compact<T>: Encode,
-{
-	fn max_encoded_len() -> usize {
-		Compact::<T::As>::max_encoded_len()
-	}
 }
 
 impl<T: 'static> HasCompact for T
