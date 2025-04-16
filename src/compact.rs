@@ -22,7 +22,7 @@ use crate::{
 	alloc::vec::Vec,
 	codec::{Decode, Encode, EncodeAsRef, Input, Output},
 	encode_like::EncodeLike,
-	Error,
+	DecodeWithMemTracking, Error,
 };
 #[cfg(feature = "fuzz")]
 use arbitrary::Arbitrary;
@@ -145,6 +145,20 @@ where
 	}
 }
 
+impl<T> DecodeWithMemTracking for Compact<T>
+where
+	T: CompactAs,
+	Compact<T::As>: Decode,
+{
+}
+
+impl DecodeWithMemTracking for Compact<()> {}
+
+impl DecodeWithMemTracking for Compact<u8> {}
+impl DecodeWithMemTracking for Compact<u16> {}
+impl DecodeWithMemTracking for Compact<u64> {}
+impl DecodeWithMemTracking for Compact<u128> {}
+
 macro_rules! impl_from_compact {
 	( $( $ty:ty ),* ) => {
 		$(
@@ -202,24 +216,10 @@ where
 	}
 }
 
-/// Requires the presence of `MaxEncodedLen` when the `max-encoded-len` feature is active.
-// Remove this trait when the feature is removed.
-#[cfg(feature = "max-encoded-len")]
-pub trait MaybeMaxEncodedLen: MaxEncodedLen {}
-#[cfg(feature = "max-encoded-len")]
-impl<T: MaxEncodedLen> MaybeMaxEncodedLen for T {}
-
-/// Requires the presence of `MaxEncodedLen` when the `max-encoded-len` feature is active.
-// Remove this trait when the feature is removed.
-#[cfg(not(feature = "max-encoded-len"))]
-pub trait MaybeMaxEncodedLen {}
-#[cfg(not(feature = "max-encoded-len"))]
-impl<T> MaybeMaxEncodedLen for T {}
-
 /// Trait that tells you if a given type can be encoded/decoded in a compact way.
 pub trait HasCompact: Sized {
 	/// The compact type; this can be
-	type Type: for<'a> EncodeAsRef<'a, Self> + Decode + From<Self> + Into<Self> + MaybeMaxEncodedLen;
+	type Type: for<'a> EncodeAsRef<'a, Self> + Decode + From<Self> + Into<Self>;
 }
 
 impl<'a, T: 'a> EncodeAsRef<'a, T> for Compact<T>
@@ -243,7 +243,7 @@ where
 
 impl<T: 'static> HasCompact for T
 where
-	Compact<T>: for<'a> EncodeAsRef<'a, T> + Decode + From<Self> + Into<Self> + MaybeMaxEncodedLen,
+	Compact<T>: for<'a> EncodeAsRef<'a, T> + Decode + From<Self> + Into<Self>,
 {
 	type Type = Compact<T>;
 }
@@ -300,7 +300,13 @@ impl CompactLen<u16> for Compact<u16> {
 	}
 }
 
-impl<'a> Encode for CompactRef<'a, u32> {
+impl CompactLen<u32> for Compact<u32> {
+	fn compact_len(val: &u32) -> usize {
+		WrappedPrimitive::<u32>::compact_len(val)
+	}
+}
+
+impl Encode for CompactRef<'_, u32> {
 	fn size_hint(&self) -> usize {
 		WrappedPrimitive(*self.0).size_hint()
 	}
@@ -314,11 +320,13 @@ impl<'a> Encode for CompactRef<'a, u32> {
 	}
 }
 
-impl CompactLen<u32> for Compact<u32> {
-	fn compact_len(val: &u32) -> usize {
-		WrappedPrimitive::<u32>::compact_len(val)
+impl Decode for Compact<u32> {
+	fn decode<I: Input>(input: &mut I) -> Result<Self, Error> {
+		WrappedPrimitive::<u32>::decode(input).map(|w| Compact(w.0))
 	}
 }
+
+impl DecodeWithMemTracking for Compact<u32> {}
 
 impl<'a> Encode for CompactRef<'a, u64> {
 	fn size_hint(&self) -> usize {
@@ -447,12 +455,6 @@ impl Decode for Compact<u8> {
 impl Decode for Compact<u16> {
 	fn decode<I: Input>(input: &mut I) -> Result<Self, Error> {
 		WrappedPrimitive::<u16>::decode(input).map(|w| Compact(w.0))
-	}
-}
-
-impl Decode for Compact<u32> {
-	fn decode<I: Input>(input: &mut I) -> Result<Self, Error> {
-		WrappedPrimitive::<u32>::decode(input).map(|w| Compact(w.0))
 	}
 }
 
