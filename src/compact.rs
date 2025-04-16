@@ -415,7 +415,7 @@ where
 	}
 }
 
-const OUT_OF_RANGE: &'static str = "Out of range";
+const OUT_OF_RANGE: &str = "Out of range";
 
 impl<T> Decode for WrappedPrimitive<T>
 where
