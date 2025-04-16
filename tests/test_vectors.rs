@@ -111,11 +111,11 @@ impl TestHarness {
 	}
 }
 
-const DUMP_FILE: &str = "vectors.bin";
-
+#[cfg(feature = "dump-test-vectors")]
 impl Drop for TestHarness {
 	fn drop(&mut self) {
 		use std::{fs::File, io::Write};
+		const DUMP_FILE: &str = "vectors.bin";
 		let mut file = File::create(DUMP_FILE).unwrap();
 		file.write_all(&self.dump).unwrap()
 	}
