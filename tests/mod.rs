@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use parity_scale_codec::{
+use jam_codec::{
 	Compact, CompactAs, Decode, DecodeWithMemTracking, Encode, EncodeAsRef, Error, HasCompact,
 	Output,
 };
-use parity_scale_codec_derive::{
+use jam_codec_derive::{
 	Decode as DeriveDecode, DecodeWithMemTracking as DeriveDecodeWithMemTracking,
 	Encode as DeriveEncode,
 };
@@ -641,7 +641,7 @@ fn custom_trait_bound() {
 #[cfg(feature = "bit-vec")]
 fn bit_vec_works() {
 	use bitvec::prelude::*;
-	use parity_scale_codec::DecodeAll;
+	use jam_codec::DecodeAll;
 
 	// Try some fancy stuff
 	let original_vec = bitvec![u8, Msb0; 1; 8];
@@ -753,7 +753,7 @@ fn zero_sized_types_are_properly_decoded_in_a_transparent_boxed_struct() {
 	struct NewtypeWithZstBox(#[allow(dead_code)] Box<NewtypeWithZst>);
 
 	impl Decode for ConsumeByte {
-		fn decode<I: parity_scale_codec::Input>(input: &mut I) -> Result<Self, Error> {
+		fn decode<I: jam_codec::Input>(input: &mut I) -> Result<Self, Error> {
 			let mut buffer = [0; 1];
 			input.read(&mut buffer).unwrap();
 			Ok(Self)
@@ -830,7 +830,7 @@ fn incomplete_decoding_of_an_array_drops_partially_read_elements_if_reading_pani
 	struct Foobar(#[allow(dead_code)] u8);
 
 	impl Decode for Foobar {
-		fn decode<I: parity_scale_codec::Input>(input: &mut I) -> Result<Self, Error> {
+		fn decode<I: jam_codec::Input>(input: &mut I) -> Result<Self, Error> {
 			let mut buffer = [0; 1];
 			input.read(&mut buffer).unwrap();
 			Ok(Self(buffer[0]))
@@ -927,7 +927,7 @@ fn deserializing_of_big_recursively_nested_enum_works() {
 	// NOTE: Not using `assert_eq` since we don't want to print out such a big object if this fails.
 	assert!(obj == obj_d);
 
-	use parity_scale_codec::DecodeLimit;
+	use jam_codec::DecodeLimit;
 	let obj_d2 = Enum::decode_with_depth_limit(40, &mut &data[..]).unwrap();
 	assert!(obj == obj_d2);
 }

@@ -1,5 +1,5 @@
-use parity_scale_codec::{Compact, Decode, Encode, Output};
-use parity_scale_codec_derive::{Decode as DecodeDerive, Encode as EncodeDerive};
+use jam_codec::{Compact, Decode, Encode, Output};
+use jam_codec_derive::{Decode as DecodeDerive, Encode as EncodeDerive};
 use std::vec::Vec;
 
 /// A trivial and fast shuffle used by tests.

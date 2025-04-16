@@ -1,5 +1,5 @@
-use parity_scale_codec::{Compact, Decode, DecodeWithMemTracking, Encode, HasCompact};
-use parity_scale_codec_derive::{
+use jam_codec::{Compact, Decode, DecodeWithMemTracking, Encode, HasCompact};
+use jam_codec_derive::{
 	CompactAs as DeriveCompactAs, Decode as DeriveDecode,
 	DecodeWithMemTracking as DeriveDecodeWithMemTracking, Encode as DeriveEncode,
 };
