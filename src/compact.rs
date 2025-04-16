@@ -153,8 +153,6 @@ where
 {
 }
 
-impl DecodeWithMemTracking for Compact<()> {}
-
 macro_rules! impl_from_compact {
 	( $( $ty:ty ),* ) => {
 		$(
@@ -256,6 +254,76 @@ impl Encode for CompactRef<'_, ()> {
 	}
 }
 
+struct WrappedPrimitive<T>(T);
+
+impl<T> CompactLen<T> for WrappedPrimitive<T>
+where
+	T: Copy + Into<u64>,
+{
+	fn compact_len(val: &T) -> usize {
+		let x = (*val).into();
+		1 + if x == 0 {
+			0
+		} else if let Some(l) = (0..8).find(|l| 2_u64.pow(7 * l) <= x && x < 2_u64.pow(7 * (l + 1)))
+		{
+			l
+		} else {
+			8
+		} as usize
+	}
+}
+
+impl<T> Encode for WrappedPrimitive<T>
+where
+	T: Copy + Into<u64>,
+{
+	fn size_hint(&self) -> usize {
+		Self::compact_len(&self.0)
+	}
+
+	fn encode_to<W: Output + ?Sized>(&self, dest: &mut W) {
+		let x = self.0.into();
+		if x == 0 {
+			dest.push_byte(0);
+		} else if let Some(l) = (0..8).find(|l| 2_u64.pow(7 * l) <= x && x < 2_u64.pow(7 * (l + 1)))
+		{
+			dest.push_byte((2_u64.pow(8) - 2_u64.pow(8 - l) + (x / 2_u64.pow(8 * l))) as u8);
+			dest.write(&(x % 2_u64.pow(8 * l)).to_le_bytes()[..l as usize]);
+		} else {
+			dest.push_byte((2_u64.pow(8) - 1) as u8);
+			dest.write(&x.to_le_bytes());
+		}
+	}
+
+	fn using_encoded<R, F: FnOnce(&[u8]) -> R>(&self, f: F) -> R {
+		let mut r = ArrayVecWrapper(ArrayVec::<u8, 9>::new());
+		self.encode_to(&mut r);
+		f(&r.0)
+	}
+}
+
+impl<T> Decode for WrappedPrimitive<T>
+where
+	T: Copy + TryFrom<u64>,
+{
+	fn decode<I: Input>(input: &mut I) -> Result<Self, Error> {
+		const OUT_OF_RANGE: &str = "Out of range";
+		let v = match input.read_byte()? {
+			0 => 0,
+			0xff => u64::decode(input)?,
+			b => {
+				let l = (0..8).find(|&i| (b & (0b1000_0000 >> i)) == 0).unwrap();
+				let mut buf = [0u8; 8];
+				input.read(&mut buf[..l])?;
+				let rem = (b & ((1 << (7 - l)) - 1)) as u64;
+				u64::from_le_bytes(buf) + (rem << (8 * l))
+			},
+		};
+		let v = T::try_from(v).map_err(|_| Error::from(OUT_OF_RANGE))?;
+		Ok(Self(v))
+	}
+}
+
 impl Encode for CompactRef<'_, u8> {
 	fn size_hint(&self) -> usize {
 		WrappedPrimitive(*self.0).size_hint()
@@ -316,7 +384,7 @@ impl CompactLen<u32> for Compact<u32> {
 	}
 }
 
-impl<'a> Encode for CompactRef<'a, u64> {
+impl Encode for CompactRef<'_, u64> {
 	fn size_hint(&self) -> usize {
 		WrappedPrimitive(*self.0).size_hint()
 	}
@@ -336,7 +404,7 @@ impl CompactLen<u64> for Compact<u64> {
 	}
 }
 
-impl<'a> Encode for CompactRef<'a, u128> {
+impl Encode for CompactRef<'_, u128> {
 	fn size_hint(&self) -> usize {
 		Compact::<u128>::compact_len(self.0)
 	}
@@ -363,76 +431,7 @@ impl Decode for Compact<()> {
 	}
 }
 
-struct WrappedPrimitive<T>(T);
-
-impl<T> CompactLen<T> for WrappedPrimitive<T>
-where
-	T: Copy + Into<u64>,
-{
-	fn compact_len(val: &T) -> usize {
-		let x = (*val).into();
-		1 + if x == 0 {
-			0
-		} else if let Some(l) = (0..8).find(|l| 2_u64.pow(7 * l) <= x && x < 2_u64.pow(7 * (l + 1)))
-		{
-			l
-		} else {
-			8
-		} as usize
-	}
-}
-
-impl<T> Encode for WrappedPrimitive<T>
-where
-	T: Copy + Into<u64>,
-{
-	fn size_hint(&self) -> usize {
-		Self::compact_len(&self.0)
-	}
-
-	fn encode_to<W: Output + ?Sized>(&self, dest: &mut W) {
-		let x = self.0.into();
-		if x == 0 {
-			dest.push_byte(0);
-		} else if let Some(l) = (0..8).find(|l| 2_u64.pow(7 * l) <= x && x < 2_u64.pow(7 * (l + 1)))
-		{
-			dest.push_byte((2_u64.pow(8) - 2_u64.pow(8 - l) + (x / 2_u64.pow(8 * l))) as u8);
-			dest.write(&(x % 2_u64.pow(8 * l)).to_le_bytes()[..l as usize]);
-		} else {
-			dest.push_byte((2_u64.pow(8) - 1) as u8);
-			dest.write(&x.to_le_bytes());
-		}
-	}
-
-	fn using_encoded<R, F: FnOnce(&[u8]) -> R>(&self, f: F) -> R {
-		let mut r = ArrayVecWrapper(ArrayVec::<u8, 9>::new());
-		self.encode_to(&mut r);
-		f(&r.0)
-	}
-}
-
-const OUT_OF_RANGE: &str = "Out of range";
-
-impl<T> Decode for WrappedPrimitive<T>
-where
-	T: Copy + TryFrom<u64>,
-{
-	fn decode<I: Input>(input: &mut I) -> Result<Self, Error> {
-		let v = match input.read_byte()? {
-			0 => 0,
-			0xff => u64::decode(input)?,
-			b => {
-				let l = (0..8).find(|&i| (b & (0b1000_0000 >> i)) == 0).unwrap();
-				let mut buf = [0u8; 8];
-				input.read(&mut buf[..l])?;
-				let rem = (b & ((1 << (7 - l)) - 1)) as u64;
-				u64::from_le_bytes(buf) + (rem << (8 * l))
-			},
-		};
-		let v = T::try_from(v).map_err(|_| Error::from(OUT_OF_RANGE))?;
-		Ok(Self(v))
-	}
-}
+impl DecodeWithMemTracking for Compact<()> {}
 
 impl DecodeWithMemTracking for Compact<u8> {}
 
