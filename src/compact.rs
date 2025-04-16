@@ -105,14 +105,14 @@ where
 	}
 }
 
-impl<'a, T> EncodeLike for CompactRef<'a, T>
+impl<T> EncodeLike for CompactRef<'_, T>
 where
 	T: CompactAs,
 	for<'b> CompactRef<'b, T::As>: Encode,
 {
 }
 
-impl<'a, T> Encode for CompactRef<'a, T>
+impl<T> Encode for CompactRef<'_, T>
 where
 	T: CompactAs,
 	for<'b> CompactRef<'b, T::As>: Encode,
@@ -148,7 +148,7 @@ where
 impl<T> DecodeWithMemTracking for Compact<T>
 where
 	T: CompactAs,
-	Compact<T::As>: Decode,
+	Compact<T::As>: DecodeWithMemTracking,
 {
 }
 
@@ -248,7 +248,7 @@ where
 	type Type = Compact<T>;
 }
 
-impl<'a> Encode for CompactRef<'a, ()> {
+impl Encode for CompactRef<'_, ()> {
 	fn encode_to<W: Output + ?Sized>(&self, _dest: &mut W) {}
 
 	fn using_encoded<R, F: FnOnce(&[u8]) -> R>(&self, f: F) -> R {
@@ -260,7 +260,7 @@ impl<'a> Encode for CompactRef<'a, ()> {
 	}
 }
 
-impl<'a> Encode for CompactRef<'a, u8> {
+impl Encode for CompactRef<'_, u8> {
 	fn size_hint(&self) -> usize {
 		WrappedPrimitive(*self.0).size_hint()
 	}
@@ -280,7 +280,7 @@ impl CompactLen<u8> for Compact<u8> {
 	}
 }
 
-impl<'a> Encode for CompactRef<'a, u16> {
+impl Encode for CompactRef<'_, u16> {
 	fn size_hint(&self) -> usize {
 		WrappedPrimitive(*self.0).size_hint()
 	}
@@ -300,12 +300,6 @@ impl CompactLen<u16> for Compact<u16> {
 	}
 }
 
-impl CompactLen<u32> for Compact<u32> {
-	fn compact_len(val: &u32) -> usize {
-		WrappedPrimitive::<u32>::compact_len(val)
-	}
-}
-
 impl Encode for CompactRef<'_, u32> {
 	fn size_hint(&self) -> usize {
 		WrappedPrimitive(*self.0).size_hint()
@@ -320,9 +314,9 @@ impl Encode for CompactRef<'_, u32> {
 	}
 }
 
-impl Decode for Compact<u32> {
-	fn decode<I: Input>(input: &mut I) -> Result<Self, Error> {
-		WrappedPrimitive::<u32>::decode(input).map(|w| Compact(w.0))
+impl CompactLen<u32> for Compact<u32> {
+	fn compact_len(val: &u32) -> usize {
+		WrappedPrimitive::<u32>::compact_len(val)
 	}
 }
 
@@ -455,6 +449,12 @@ impl Decode for Compact<u8> {
 impl Decode for Compact<u16> {
 	fn decode<I: Input>(input: &mut I) -> Result<Self, Error> {
 		WrappedPrimitive::<u16>::decode(input).map(|w| Compact(w.0))
+	}
+}
+
+impl Decode for Compact<u32> {
+	fn decode<I: Input>(input: &mut I) -> Result<Self, Error> {
+		WrappedPrimitive::<u32>::decode(input).map(|w| Compact(w.0))
 	}
 }
 
