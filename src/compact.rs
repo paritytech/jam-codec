@@ -433,15 +433,13 @@ impl Decode for Compact<()> {
 
 impl DecodeWithMemTracking for Compact<()> {}
 
-impl DecodeWithMemTracking for Compact<u8> {}
-
 impl Decode for Compact<u8> {
 	fn decode<I: Input>(input: &mut I) -> Result<Self, Error> {
 		WrappedPrimitive::<u8>::decode(input).map(|w| Compact(w.0))
 	}
 }
 
-impl DecodeWithMemTracking for Compact<u16> {}
+impl DecodeWithMemTracking for Compact<u8> {}
 
 impl Decode for Compact<u16> {
 	fn decode<I: Input>(input: &mut I) -> Result<Self, Error> {
@@ -449,7 +447,7 @@ impl Decode for Compact<u16> {
 	}
 }
 
-impl DecodeWithMemTracking for Compact<u32> {}
+impl DecodeWithMemTracking for Compact<u16> {}
 
 impl Decode for Compact<u32> {
 	fn decode<I: Input>(input: &mut I) -> Result<Self, Error> {
@@ -457,7 +455,7 @@ impl Decode for Compact<u32> {
 	}
 }
 
-impl DecodeWithMemTracking for Compact<u64> {}
+impl DecodeWithMemTracking for Compact<u32> {}
 
 impl Decode for Compact<u64> {
 	fn decode<I: Input>(input: &mut I) -> Result<Self, Error> {
@@ -465,7 +463,7 @@ impl Decode for Compact<u64> {
 	}
 }
 
-impl DecodeWithMemTracking for Compact<u128> {}
+impl DecodeWithMemTracking for Compact<u64> {}
 
 impl Decode for Compact<u128> {
 	fn decode<I: Input>(input: &mut I) -> Result<Self, Error> {
@@ -474,6 +472,8 @@ impl Decode for Compact<u128> {
 		Ok(Compact((h as u128) << 64 | l as u128))
 	}
 }
+
+impl DecodeWithMemTracking for Compact<u128> {}
 
 #[cfg(test)]
 mod tests {
