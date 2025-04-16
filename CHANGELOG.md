@@ -5,6 +5,36 @@ All notable changes to this crate are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this crate adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### [3.7.4] - 2025-02-05
+
+### Added
+
+- Disallow duplicate indexes using constant evaluation ([#653](https://github.com/paritytech/parity-scale-codec/pull/653))
+
+### [3.7.3] - 2025-01-30
+
+### Added
+
+- Fix added bounds in `Encode` and other derive macros. ([#689](https://github.com/paritytech/parity-scale-codec/pull/689))
+
+## [3.7.0] - 2024-11-18
+
+### Added
+
+- Allow decoding with a memory limit. ([616](https://github.com/paritytech/parity-scale-codec/pull/616))
+- Introduce `CountedInput`, an wrapper on `Input` that counts the bytes read. ([630](https://github.com/paritytech/parity-scale-codec/pull/630))
+
+### Changed
+
+- This release bumps some dependencies, primarily bumping `syn` to 2. ([#640](https://github.com/paritytech/parity-scale-codec/pull/640)).
+
+### Fixed
+
+- Fix MaxEncodedLen derive macro for enum with skipped variant ([#622](https://github.com/paritytech/parity-scale-codec/pull/622))
+- Use MAX_PREALLOCATION consistently [#605](https://github.com/paritytech/parity-scale-codec/pull/605)
+
 ## [3.6.4] - 2023-07-14
 
 ### Added
@@ -16,7 +46,7 @@ and this crate adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.h
 
 ### Fixed
 
-- Provide full path to elements from `::core` in `Decode` derivation (caused compilation error when 
+- Provide full path to elements from `::core` in `Decode` derivation (caused compilation error when
   `no-implicit-prelude` was used).
 
 ## [3.6.2] - 2023-06-30

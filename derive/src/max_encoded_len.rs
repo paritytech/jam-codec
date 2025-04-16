@@ -17,7 +17,7 @@
 
 use crate::{
 	trait_bounds,
-	utils::{self, codec_crate_path, custom_mel_trait_bound, has_dumb_trait_bound, should_skip},
+	utils::{codec_crate_path, custom_mel_trait_bound, has_dumb_trait_bound, should_skip},
 };
 use quote::{quote, quote_spanned};
 use syn::{parse_quote, spanned::Spanned, Data, DeriveInput, Field, Fields};
@@ -44,6 +44,7 @@ pub fn derive_max_encoded_len(input: proc_macro::TokenStream) -> proc_macro::Tok
 		None,
 		has_dumb_trait_bound(&input.attrs),
 		&crate_path,
+		false,
 	) {
 		return e.to_compile_error().into();
 	}
@@ -53,6 +54,7 @@ pub fn derive_max_encoded_len(input: proc_macro::TokenStream) -> proc_macro::Tok
 
 	quote::quote!(
 		const _: () = {
+			#[automatically_derived]
 			impl #impl_generics #crate_path::MaxEncodedLen for #name #ty_generics #where_clause {
 				fn max_encoded_len() -> ::core::primitive::usize {
 					#data_expr
@@ -84,16 +86,8 @@ fn fields_length_expr(fields: &Fields, crate_path: &syn::Path) -> proc_macro2::T
 	// caused the issue.
 	let expansion = fields_iter.map(|field| {
 		let ty = &field.ty;
-		if utils::is_compact(field) {
-			quote_spanned! {
-				ty.span() => .saturating_add(
-					<<#ty as #crate_path::HasCompact>::Type as #crate_path::MaxEncodedLen>::max_encoded_len()
-				)
-			}
-		} else {
-			quote_spanned! {
-				ty.span() => .saturating_add(<#ty as #crate_path::MaxEncodedLen>::max_encoded_len())
-			}
+		quote_spanned! {
+			ty.span() => .saturating_add(<#ty as #crate_path::MaxEncodedLen>::max_encoded_len())
 		}
 	});
 	quote! {

@@ -37,7 +37,7 @@ struct DepthTrackingInput<'a, I> {
 	max_depth: u32,
 }
 
-impl<'a, I: Input> Input for DepthTrackingInput<'a, I> {
+impl<I: Input> Input for DepthTrackingInput<'_, I> {
 	fn remaining_len(&mut self) -> Result<Option<usize>, Error> {
 		self.input.remaining_len()
 	}
@@ -63,6 +63,10 @@ impl<'a, I: Input> Input for DepthTrackingInput<'a, I> {
 	fn ascend_ref(&mut self) {
 		self.input.ascend_ref();
 		self.depth -= 1;
+	}
+
+	fn on_before_alloc_mem(&mut self, size: usize) -> Result<(), Error> {
+		self.input.on_before_alloc_mem(size)
 	}
 }
 

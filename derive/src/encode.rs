@@ -17,7 +17,7 @@ use std::str::from_utf8;
 use proc_macro2::{Ident, Span, TokenStream};
 use syn::{punctuated::Punctuated, spanned::Spanned, token::Comma, Data, Error, Field, Fields};
 
-use crate::utils;
+use crate::utils::{self, const_eval_check_variant_indexes};
 
 type FieldsList = Punctuated<Field, Comma>;
 
@@ -28,7 +28,7 @@ fn encode_single_field(
 	crate_path: &syn::Path,
 ) -> TokenStream {
 	let encoded_as = utils::get_encoded_as_type(field);
-	let compact = utils::is_compact(field);
+	let compact = utils::get_compact_type(field, crate_path);
 
 	if utils::should_skip(&field.attrs) {
 		return Error::new(
@@ -38,7 +38,7 @@ fn encode_single_field(
 		.to_compile_error();
 	}
 
-	if encoded_as.is_some() && compact {
+	if encoded_as.is_some() && compact.is_some() {
 		return Error::new(
 			Span::call_site(),
 			"`encoded_as` and `compact` can not be used at the same time!",
@@ -46,12 +46,11 @@ fn encode_single_field(
 		.to_compile_error();
 	}
 
-	let final_field_variable = if compact {
+	let final_field_variable = if let Some(compact) = compact {
 		let field_type = &field.ty;
 		quote_spanned! {
 			field.span() => {
-				<<#field_type as #crate_path::HasCompact>::Type as
-				#crate_path::EncodeAsRef<'_, #field_type>>::RefType::from(#field_name)
+				<#compact as #crate_path::EncodeAsRef<'_, #field_type>>::RefType::from(#field_name)
 			}
 		}
 	} else if let Some(encoded_as) = encoded_as {
@@ -298,23 +297,17 @@ fn impl_encode(data: &Data, type_name: &Ident, crate_path: &syn::Path) -> TokenS
 			Fields::Unit => [quote! { 0_usize }, quote!()],
 		},
 		Data::Enum(ref data) => {
-			let data_variants =
-				|| data.variants.iter().filter(|variant| !utils::should_skip(&variant.attrs));
-
-			if data_variants().count() > 256 {
-				return Error::new(
-					data.variants.span(),
-					"Currently only enums with at most 256 variants are encodable.",
-				)
-				.to_compile_error();
-			}
+			let variants = match utils::try_get_variants(data) {
+				Ok(variants) => variants,
+				Err(e) => return e.to_compile_error(),
+			};
 
 			// If the enum has no variants, we don't need to encode anything.
-			if data_variants().count() == 0 {
+			if variants.is_empty() {
 				return quote!();
 			}
 
-			let recurse = data_variants().enumerate().map(|(i, f)| {
+			let recurse = variants.iter().enumerate().map(|(i, f)| {
 				let name = &f.ident;
 				let index = utils::variant_index(f, i);
 
@@ -340,12 +333,13 @@ fn impl_encode(data: &Data, type_name: &Ident, crate_path: &syn::Path) -> TokenS
 						let encoding_names = names.clone();
 						let encoding = quote_spanned! { f.span() =>
 							#type_name :: #name { #( ref #encoding_names, )* } => {
-								#dest.push_byte(#index as ::core::primitive::u8);
+								#[allow(clippy::unnecessary_cast)]
+								#dest.push_byte((#index) as ::core::primitive::u8);
 								#encode_fields
 							}
 						};
 
-						[hinting, encoding]
+						(hinting, encoding, index, name.clone())
 					},
 					Fields::Unnamed(ref fields) => {
 						let fields = &fields.unnamed;
@@ -373,12 +367,13 @@ fn impl_encode(data: &Data, type_name: &Ident, crate_path: &syn::Path) -> TokenS
 						let encoding_names = names.clone();
 						let encoding = quote_spanned! { f.span() =>
 							#type_name :: #name ( #( ref #encoding_names, )* ) => {
-								#dest.push_byte(#index as ::core::primitive::u8);
+								#[allow(clippy::unnecessary_cast)]
+								#dest.push_byte((#index) as ::core::primitive::u8);
 								#encode_fields
 							}
 						};
 
-						[hinting, encoding]
+						(hinting, encoding, index, name.clone())
 					},
 					Fields::Unit => {
 						let hinting = quote_spanned! { f.span() =>
@@ -390,17 +385,19 @@ fn impl_encode(data: &Data, type_name: &Ident, crate_path: &syn::Path) -> TokenS
 						let encoding = quote_spanned! { f.span() =>
 							#type_name :: #name => {
 								#[allow(clippy::unnecessary_cast)]
-								#dest.push_byte(#index as ::core::primitive::u8);
+								#[allow(clippy::cast_possible_truncation)]
+								#dest.push_byte((#index) as ::core::primitive::u8);
 							}
 						};
 
-						[hinting, encoding]
+						(hinting, encoding, index, name.clone())
 					},
 				}
 			});
 
-			let recurse_hinting = recurse.clone().map(|[hinting, _]| hinting);
-			let recurse_encoding = recurse.clone().map(|[_, encoding]| encoding);
+			let recurse_hinting = recurse.clone().map(|(hinting, _, _, _)| hinting);
+			let recurse_encoding = recurse.clone().map(|(_, encoding, _, _)| encoding);
+			let recurse_variant_indices = recurse.clone().map(|(_, _, index, name)| (name, index));
 
 			let hinting = quote! {
 				// The variant index uses 1 byte.
@@ -410,7 +407,11 @@ fn impl_encode(data: &Data, type_name: &Ident, crate_path: &syn::Path) -> TokenS
 				}
 			};
 
+			let const_eval_check =
+				const_eval_check_variant_indexes(recurse_variant_indices, crate_path);
+
 			let encoding = quote! {
+				#const_eval_check
 				match *#self_ {
 					#( #recurse_encoding )*,
 					_ => (),
