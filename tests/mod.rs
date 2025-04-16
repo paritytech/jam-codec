@@ -264,6 +264,7 @@ const U64_TEST_COMPACT_VALUES_FOR_ENUM: &[(u64, usize)] = &[
 fn encoded_as_with_has_compact_works() {
 	for &(n, l) in U64_TEST_COMPACT_VALUES {
 		let encoded = TestHasCompact { bar: n }.encode();
+		println!("{}", n);
 		assert_eq!(encoded.len(), l);
 		assert_eq!(<TestHasCompact<u64>>::decode(&mut &encoded[..]).unwrap().bar, n);
 	}
@@ -273,6 +274,7 @@ fn encoded_as_with_has_compact_works() {
 fn compact_with_has_compact_works() {
 	for &(n, l) in U64_TEST_COMPACT_VALUES {
 		let encoded = TestHasCompact { bar: n }.encode();
+		println!("{}", n);
 		assert_eq!(encoded.len(), l);
 		assert_eq!(<TestCompactHasCompact<u64>>::decode(&mut &encoded[..]).unwrap().bar, n);
 	}
@@ -299,10 +301,7 @@ fn enum_compact_and_encoded_as_with_has_compact_works() {
 
 #[test]
 fn compact_meta_attribute_works() {
-	let mut i = 0;
 	for &(n, l) in U64_TEST_COMPACT_VALUES {
-		println!("{i}");
-		i += 1;
 		let encoded = TestCompactAttribute { bar: n }.encode();
 		assert_eq!(encoded.len(), l);
 		assert_eq!(TestCompactAttribute::decode(&mut &encoded[..]).unwrap().bar, n);
@@ -311,10 +310,7 @@ fn compact_meta_attribute_works() {
 
 #[test]
 fn enum_compact_meta_attribute_works() {
-	let mut i = 0;
 	for &(n, l) in U64_TEST_COMPACT_VALUES_FOR_ENUM {
-		println!("{i}");
-		i += 1;
 		for value in
 			[TestCompactAttributeEnum::Unnamed(n), TestCompactAttributeEnum::Named { bar: n }]
 				.iter()
