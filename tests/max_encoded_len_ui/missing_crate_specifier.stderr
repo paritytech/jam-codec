@@ -2,7 +2,7 @@ error: Invalid attribute: only `#[codec(dumb_trait_bound)]`, `#[codec(crate = pa
  --> tests/max_encoded_len_ui/missing_crate_specifier.rs:4:9
   |
 4 | #[codec(jam_codec)]
-  |         ^^^^^^^^^^^^^^^^^^
+  |         ^^^^^^^^^
 
 error[E0277]: the trait bound `Example: Encode` is not satisfied
  --> tests/max_encoded_len_ui/missing_crate_specifier.rs:5:8
