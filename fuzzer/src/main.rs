@@ -12,7 +12,7 @@ use honggfuzz::{
 	arbitrary::{Arbitrary, Result as ArbResult, Unstructured},
 	fuzz,
 };
-use parity_scale_codec::{Compact, Decode, Encode};
+use jam_codec::{Compact, Decode, Encode};
 
 #[derive(Encode, Decode, Clone, PartialEq, Debug, Arbitrary)]
 pub struct MockStruct {
