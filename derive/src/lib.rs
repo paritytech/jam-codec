@@ -69,9 +69,9 @@ fn wrap_with_dummy_const(
 /// * `#[codec(compact)]`: the field is encoded in its compact representation i.e. the field must
 ///   implement `jam_codec::HasCompact` and will be encoded as `HasCompact::Type`.
 /// * `#[codec(encoded_as = "$EncodeAs")]`: the field is encoded as an alternative type. $EncodedAs
-///   type must implement `jam_codec::EncodeAsRef<'_, $FieldType>` with $FieldType the type
-///   of the field with the attribute. This is intended to be used for types implementing
-///   `HasCompact` as shown in the example.
+///   type must implement `jam_codec::EncodeAsRef<'_, $FieldType>` with $FieldType the type of the
+///   field with the attribute. This is intended to be used for types implementing `HasCompact` as
+///   shown in the example.
 ///
 /// ```
 /// # use jam_codec_derive::Encode;
