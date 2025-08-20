@@ -250,11 +250,10 @@ where
 		let x = (*val).into();
 		1 + if x == 0 {
 			0
-		} else if let Some(l) = (0..8).find(|l| 2_u64.pow(7 * l) <= x && x < 2_u64.pow(7 * (l + 1)))
-		{
-			l
 		} else {
-			8
+			(0..8)
+				.find(|l| 2_u64.pow(7 * l) <= x && x < 2_u64.pow(7 * (l + 1)))
+				.unwrap_or(8)
 		} as usize
 	}
 }

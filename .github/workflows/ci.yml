@@ -29,7 +29,7 @@ jobs:
     container: ${{ needs.set-image.outputs.IMAGE }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Show Cargo version
         run: cargo +nightly -vV
@@ -43,7 +43,7 @@ jobs:
     container: ${{ needs.set-image.outputs.IMAGE }}
     steps:
       - name: Checkout code/.
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Show Rust version
         run: |
@@ -59,7 +59,7 @@ jobs:
       - name: Run Clippy
         run: |
           cargo +stable clippy --locked -- -Dwarnings
-          cargo +stable clippy --locked -p parity-scale-codec-derive -- -Dwarnings
+          cargo +stable clippy --locked -p jam-codec-derive -- -Dwarnings
           cargo +stable clippy --locked --test clippy -- -Dwarnings
 
   checks:
@@ -68,7 +68,7 @@ jobs:
     container: ${{ needs.set-image.outputs.IMAGE }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Show Rust version
         run: |
@@ -106,7 +106,7 @@ jobs:
     container: ${{ needs.set-image.outputs.IMAGE }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Show Rust version
         run: |
@@ -154,7 +154,7 @@ jobs:
     container: ${{ needs.set-image.outputs.IMAGE }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Cache Rust dependencies
         uses: swatinem/rust-cache@v2
@@ -175,7 +175,7 @@ jobs:
     container: ${{ needs.set-image.outputs.IMAGE }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Cache Rust dependencies
         uses: swatinem/rust-cache@v2
@@ -197,7 +197,7 @@ jobs:
     container: ${{ needs.set-image.outputs.IMAGE }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Cache Rust dependencies
         uses: swatinem/rust-cache@v2
@@ -213,7 +213,7 @@ jobs:
     container: ${{ needs.set-image.outputs.IMAGE }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Cache Rust dependencies
         uses: swatinem/rust-cache@v2
@@ -222,4 +222,4 @@ jobs:
 
       - name: Dry Run Publish
         if: github.event_name == 'pull_request'
-        run: cargo publish -p parity-scale-codec-derive --dry-run
+        run: cargo publish -p jam-codec-derive --dry-run
