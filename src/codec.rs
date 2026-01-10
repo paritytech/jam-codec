@@ -338,7 +338,7 @@ pub trait Decode: Sized {
 	/// type have the given size (in bytes) when encoded.
 	///
 	/// NOTE: A type with a fixed encoded size may return `None`.
-	fn encoded_fixed_size() -> Option<usize> {
+	const fn encoded_fixed_size() -> Option<usize> {
 		None
 	}
 }

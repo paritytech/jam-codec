@@ -213,6 +213,9 @@ pub fn decode_derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream 
 	let decode_into_body =
 		decode::quote_decode_into(&input.data, &crate_path, &input_, &input.attrs);
 
+	let encoded_fixed_size_into_body =
+		decode::quote_encoded_fixed_size(&input.data, &crate_path);
+
 	let impl_decode_into = if let Some(body) = decode_into_body {
 		quote! {
 			fn decode_into<__CodecInputEdqy: #crate_path::Input>(
@@ -233,6 +236,10 @@ pub fn decode_derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream 
 				#input_: &mut __CodecInputEdqy
 			) -> ::core::result::Result<Self, #crate_path::Error> {
 				#decoding
+			}
+
+			fn encoded_fixed_size() -> ::core::option::Option<usize> {
+				#encoded_fixed_size_into_body
 			}
 
 			#impl_decode_into

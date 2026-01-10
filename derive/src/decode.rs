@@ -114,7 +114,7 @@ pub fn quote_decode_into(
 	// Make sure the type is `#[repr(transparent)]`, as this guarantees that
 	// there can be only one field that is not zero-sized.
 	if !crate::utils::is_transparent(attrs) {
-		return None;
+		return None
 	}
 
 	let fields = match data {
@@ -128,7 +128,7 @@ pub fn quote_decode_into(
 	};
 
 	if fields.is_empty() {
-		return None;
+		return None
 	}
 
 	// Bail if there are any extra attributes which could influence how the type is decoded.
@@ -137,7 +137,7 @@ pub fn quote_decode_into(
 			utils::is_compact(field) ||
 			utils::should_skip(&field.attrs)
 	}) {
-		return None;
+		return None
 	}
 
 	// Go through each field and call `decode_into` on it.
@@ -188,6 +188,60 @@ pub fn quote_decode_into(
 	})
 }
 
+pub fn quote_encoded_fixed_size(data: &Data, crate_path: &syn::Path) -> TokenStream {
+	let fields: Box<dyn Iterator<Item = &Field>> = match data {
+		Data::Struct(data) => Box::new(data.fields.iter()),
+		Data::Enum(data) => {
+			let variants = match utils::try_get_variants(data) {
+				Ok(variants) => variants,
+				Err(e) => return e.to_compile_error(),
+			};
+
+			let mut fields: Box<dyn Iterator<Item = &Field>> = Box::new(iter::empty());
+			for variant in variants {
+				fields = Box::new(fields.chain(variant.fields.iter()));
+			}
+			fields
+		},
+		Data::Union(_) =>
+			return Error::new(Span::call_site(), "Union types are not supported.")
+				.to_compile_error(),
+	};
+
+	let mut encoded_size_fields = Vec::new();
+	for field in fields {
+		if utils::should_skip(&field.attrs) {
+			continue
+		}
+
+		let quoted_field_type = if let Some(as_type) = utils::get_encoded_as_type(field) {
+			quote! { #as_type }
+		} else {
+			let field_type = &field.ty;
+			quote! { #field_type }
+		};
+
+		encoded_size_fields.push(quote! {{
+			const FIELD_LEN: ::core::option::Option<usize> =  <#quoted_field_type as #crate_path::Decode>::encoded_fixed_size();
+			if let Some(len) = FIELD_LEN {
+				size += len;
+			}
+		}});
+	}
+
+	if encoded_size_fields.is_empty() {
+		return quote! { Some(0usize) }
+	}
+
+	quote! {
+		let mut size: usize = 0;
+
+		#(#encoded_size_fields)*
+
+		return Some(size);
+	}
+}
+
 fn create_decode_expr(
 	field: &Field,
 	name: &str,
@@ -205,7 +259,7 @@ fn create_decode_expr(
 			field.span(),
 			"`encoded_as`, `compact` and `skip` can only be used one at a time!",
 		)
-		.to_compile_error();
+		.to_compile_error()
 	}
 
 	let err_msg = format!("Could not decode `{}`", name);
@@ -310,15 +364,14 @@ pub fn quote_decode_with_mem_tracking_checks(data: &Data, crate_path: &syn::Path
 			}
 			fields
 		},
-		Data::Union(_) => {
+		Data::Union(_) =>
 			return Error::new(Span::call_site(), "Union types are not supported.")
-				.to_compile_error();
-		},
+				.to_compile_error(),
 	};
 
 	let processed_fields = fields.filter_map(|field| {
 		if utils::should_skip(&field.attrs) {
-			return None;
+			return None
 		}
 
 		let field_type = if let Some(compact) = utils::get_compact_type(field, crate_path) {
