@@ -80,13 +80,13 @@ where
 }
 
 #[derive(Debug, PartialEq, DeriveEncode, DeriveDecode, DeriveDecodeWithMemTracking)]
-struct TestCompactHasCompact<T: HasCompact> {
+struct TestCompactHasCompact<T: HasCompact + Decode> {
 	#[codec(compact)]
 	bar: T,
 }
 
 #[derive(Debug, PartialEq, DeriveEncode, DeriveDecode, DeriveDecodeWithMemTracking)]
-enum TestHasCompactEnum<T: HasCompact> {
+enum TestHasCompactEnum<T: HasCompact + Decode> {
 	Unnamed(#[codec(encoded_as = "<T as HasCompact>::Type")] T),
 	Named {
 		#[codec(encoded_as = "<T as HasCompact>::Type")]
@@ -415,7 +415,7 @@ fn generic_bound_encoded_as() {
 
 #[test]
 fn generic_bound_hascompact() {
-	#[cfg_attr(feature = "std", derive(Serialize, Deserialize, Debug))]
+	#[cfg_attr(feature = "std", derive(Serialize, Deserialize, DeriveDecode, Debug))]
 	#[derive(PartialEq, Eq, Clone)]
 	// This struct does not impl Codec
 	struct StructHasCompact(u32);
@@ -437,7 +437,7 @@ fn generic_bound_hascompact() {
 	}
 
 	#[derive(Debug, PartialEq, DeriveEncode, DeriveDecode, DeriveDecodeWithMemTracking)]
-	enum TestGenericHasCompact<T> {
+	enum TestGenericHasCompact<T: Decode> {
 		A {
 			#[codec(compact)]
 			a: T,
@@ -755,6 +755,8 @@ fn zero_sized_types_are_properly_decoded_in_a_transparent_boxed_struct() {
 	struct NewtypeWithZstBox(#[allow(dead_code)] Box<NewtypeWithZst>);
 
 	impl Decode for ConsumeByte {
+		const ENCODED_FIXED_SIZE: Option<usize> = Some(1);
+
 		fn decode<I: jam_codec::Input>(input: &mut I) -> Result<Self, Error> {
 			let mut buffer = [0; 1];
 			input.read(&mut buffer).unwrap();
@@ -832,6 +834,8 @@ fn incomplete_decoding_of_an_array_drops_partially_read_elements_if_reading_pani
 	struct Foobar(#[allow(dead_code)] u8);
 
 	impl Decode for Foobar {
+		const ENCODED_FIXED_SIZE: Option<usize> = Some(1);
+
 		fn decode<I: jam_codec::Input>(input: &mut I) -> Result<Self, Error> {
 			let mut buffer = [0; 1];
 			input.read(&mut buffer).unwrap();

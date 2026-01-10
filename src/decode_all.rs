@@ -84,6 +84,8 @@ mod tests {
 	}
 
 	impl Decode for TestStruct {
+		const ENCODED_FIXED_SIZE: Option<usize> = None;
+
 		fn decode<I: Input>(input: &mut I) -> Result<Self, Error> {
 			Ok(Self {
 				data: Vec::<u32>::decode(input)?,

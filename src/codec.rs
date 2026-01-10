@@ -117,7 +117,7 @@ impl Input for &[u8] {
 
 	fn read(&mut self, into: &mut [u8]) -> Result<(), Error> {
 		if into.len() > self.len() {
-			return Err("Not enough data to fill buffer".into());
+			return Err("Not enough data to fill buffer".into())
 		}
 		let len = into.len();
 		into.copy_from_slice(&self[..len]);
@@ -299,6 +299,15 @@ pub trait Decode: Sized {
 	#[doc(hidden)]
 	const TYPE_INFO: TypeInfo = TypeInfo::Unknown;
 
+	/// The fixed encoded size of the type.
+	///
+	/// If it is `Some(size)` then all possible values of this
+	/// type have the given size (in bytes) when encoded.
+	///
+	/// NOTE: A type with a fixed encoded size may define `None`.
+	const ENCODED_FIXED_SIZE: Option<usize>;
+	// TODO const ENCODED_FIXED_SIZE: Option<usize> = None;
+
 	/// Attempt to deserialise the value from input.
 	fn decode<I: Input>(input: &mut I) -> Result<Self, Error>;
 
@@ -330,16 +339,6 @@ pub trait Decode: Sized {
 	/// When possible, an implementation should provide a specialized implementation.
 	fn skip<I: Input>(input: &mut I) -> Result<(), Error> {
 		Self::decode(input).map(|_| ())
-	}
-
-	/// Returns the fixed encoded size of the type.
-	///
-	/// If it returns `Some(size)` then all possible values of this
-	/// type have the given size (in bytes) when encoded.
-	///
-	/// NOTE: A type with a fixed encoded size may return `None`.
-	const fn encoded_fixed_size() -> Option<usize> {
-		None
 	}
 }
 
@@ -434,7 +433,7 @@ impl Input for BytesCursor {
 
 	fn read(&mut self, into: &mut [u8]) -> Result<(), Error> {
 		if into.len() > self.bytes.len() - self.position {
-			return Err("Not enough data to fill buffer".into());
+			return Err("Not enough data to fill buffer".into())
 		}
 
 		into.copy_from_slice(&self.bytes[self.position..self.position + into.len()]);
@@ -449,7 +448,7 @@ impl Input for BytesCursor {
 		self.position = 0;
 
 		if length > self.bytes.len() {
-			return Err("Not enough data to fill buffer".into());
+			return Err("Not enough data to fill buffer".into())
 		}
 
 		self.on_before_alloc_mem(length)?;
@@ -632,6 +631,8 @@ where
 	T: Decode + Into<X>,
 	X: WrapperTypeDecode<Wrapped = T>,
 {
+	const ENCODED_FIXED_SIZE: Option<usize> = <T as Decode>::ENCODED_FIXED_SIZE;
+
 	#[inline]
 	fn decode<I: Input>(input: &mut I) -> Result<Self, Error> {
 		Self::decode_wrapped(input)
@@ -702,6 +703,9 @@ where
 }
 
 impl<T: Decode, E: Decode> Decode for Result<T, E> {
+	// TODO max R E + 1
+	const ENCODED_FIXED_SIZE: Option<usize> = None;
+
 	fn decode<I: Input>(input: &mut I) -> Result<Self, Error> {
 		match input
 			.read_byte()
@@ -745,6 +749,8 @@ impl Encode for OptionBool {
 impl EncodeLike for OptionBool {}
 
 impl Decode for OptionBool {
+	const ENCODED_FIXED_SIZE: Option<usize> = Some(1);
+
 	fn decode<I: Input>(input: &mut I) -> Result<Self, Error> {
 		match input.read_byte()? {
 			0 => Ok(OptionBool(None)),
@@ -779,6 +785,9 @@ impl<T: Encode> Encode for Option<T> {
 }
 
 impl<T: Decode> Decode for Option<T> {
+	const ENCODED_FIXED_SIZE: Option<usize> =
+		if let Some(s) = T::ENCODED_FIXED_SIZE { Some(s + 1) } else { None };
+
 	fn decode<I: Input>(input: &mut I) -> Result<Self, Error> {
 		match input
 			.read_byte()
@@ -819,6 +828,9 @@ macro_rules! impl_for_non_zero {
 			impl EncodeLike for $name {}
 
 			impl Decode for $name {
+				// TODO incorrect: need to use inner type of NonZero: read code
+				const ENCODED_FIXED_SIZE: Option<usize> = Some(::core::mem::size_of::<Self>());
+
 				fn decode<I: Input>(input: &mut I) -> Result<Self, Error> {
 					Self::new(Decode::decode(input)?)
 						.ok_or_else(|| Error::from("cannot create non-zero number from 0"))
@@ -904,6 +916,13 @@ const fn calculate_array_bytesize<T, const N: usize>() -> usize {
 }
 
 impl<T: Decode, const N: usize> Decode for [T; N] {
+	const ENCODED_FIXED_SIZE: Option<usize> =
+		if let Some(fixed_size) = <T as Decode>::ENCODED_FIXED_SIZE {
+			Some(fixed_size * N)
+		} else {
+			None
+		};
+
 	#[inline(always)]
 	fn decode<I: Input>(input: &mut I) -> Result<Self, Error> {
 		let mut array = MaybeUninit::uninit();
@@ -955,9 +974,7 @@ impl<T: Decode, const N: usize> Decode for [T; N] {
 			input.read(slice)?;
 
 			// SAFETY: We've initialized the whole slice so calling this is safe.
-			unsafe {
-				return Ok(DecodeFinished::assert_decoding_finished());
-			}
+			unsafe { return Ok(DecodeFinished::assert_decoding_finished()) }
 		}
 
 		let slice: &mut [MaybeUninit<T>; N] = {
@@ -982,7 +999,7 @@ impl<T: Decode, const N: usize> Decode for [T; N] {
 					//
 					// Most likely won't make a difference in release mode, but will
 					// make a difference in debug mode.
-					return;
+					return
 				}
 
 				// TODO: Use `MaybeUninit::slice_assume_init_mut` + `core::ptr::drop_in_place`
@@ -1013,7 +1030,7 @@ impl<T: Decode, const N: usize> Decode for [T; N] {
 	}
 
 	fn skip<I: Input>(input: &mut I) -> Result<(), Error> {
-		if Self::encoded_fixed_size().is_some() {
+		if Self::ENCODED_FIXED_SIZE.is_some() {
 			// Should skip the bytes, but Input does not support skip.
 			for _ in 0..N {
 				T::skip(input)?;
@@ -1022,10 +1039,6 @@ impl<T: Decode, const N: usize> Decode for [T; N] {
 			Self::decode(input)?;
 		}
 		Ok(())
-	}
-
-	fn encoded_fixed_size() -> Option<usize> {
-		Some(<T as Decode>::encoded_fixed_size()? * N)
 	}
 }
 
@@ -1055,6 +1068,8 @@ impl<T: ToOwned + ?Sized> Decode for Cow<'_, T>
 where
 	<T as ToOwned>::Owned: Decode,
 {
+	const ENCODED_FIXED_SIZE: Option<usize> = <T as ToOwned>::Owned::ENCODED_FIXED_SIZE;
+
 	fn decode<I: Input>(input: &mut I) -> Result<Self, Error> {
 		Ok(Cow::Owned(Decode::decode(input)?))
 	}
@@ -1074,6 +1089,8 @@ impl<T> Encode for PhantomData<T> {
 }
 
 impl<T> Decode for PhantomData<T> {
+	const ENCODED_FIXED_SIZE: Option<usize> = Some(0);
+
 	fn decode<I: Input>(_input: &mut I) -> Result<Self, Error> {
 		Ok(PhantomData)
 	}
@@ -1082,6 +1099,8 @@ impl<T> Decode for PhantomData<T> {
 impl<T> DecodeWithMemTracking for PhantomData<T> where PhantomData<T>: Decode {}
 
 impl Decode for String {
+	const ENCODED_FIXED_SIZE: Option<usize> = None;
+
 	fn decode<I: Input>(input: &mut I) -> Result<Self, Error> {
 		Self::from_utf8(Vec::decode(input)?).map_err(|_| "Invalid utf8 sequence".into())
 	}
@@ -1095,7 +1114,7 @@ pub(crate) fn compact_encode_len_to<W: Output + ?Sized>(
 	len: usize,
 ) -> Result<(), Error> {
 	if len > u32::MAX as usize {
-		return Err("Attempted to serialize a collection with too many elements.".into());
+		return Err("Attempted to serialize a collection with too many elements.".into())
 	}
 
 	Compact(len as u32).encode_to(dest);
@@ -1159,7 +1178,7 @@ where
 	// Check if there is enough data in the input buffer.
 	if let Some(input_len) = input.remaining_len()? {
 		if input_len < byte_len {
-			return Err("Not enough data to decode vector".into());
+			return Err("Not enough data to decode vector".into())
 		}
 	}
 
@@ -1227,6 +1246,8 @@ impl<T: EncodeLike<U>, U: Encode> EncodeLike<&[U]> for Vec<T> {}
 impl<T: EncodeLike<U>, U: Encode> EncodeLike<Vec<U>> for &[T] {}
 
 impl<T: Decode> Decode for Vec<T> {
+	const ENCODED_FIXED_SIZE: Option<usize> = None;
+
 	fn decode<I: Input>(input: &mut I) -> Result<Self, Error> {
 		<Compact<u32>>::decode(input)
 			.and_then(move |Compact(len)| decode_vec_with_len(input, len as usize))
@@ -1271,6 +1292,8 @@ impl_encode_for_collection! {
 }
 
 impl<K: Decode + Ord, V: Decode> Decode for BTreeMap<K, V> {
+	const ENCODED_FIXED_SIZE: Option<usize> = None;
+
 	fn decode<I: Input>(input: &mut I) -> Result<Self, Error> {
 		<Compact<u32>>::decode(input).and_then(move |Compact(len)| {
 			input.descend_ref()?;
@@ -1293,6 +1316,8 @@ impl_encode_for_collection! {
 }
 
 impl<T: Decode + Ord> Decode for BTreeSet<T> {
+	const ENCODED_FIXED_SIZE: Option<usize> = None;
+
 	fn decode<I: Input>(input: &mut I) -> Result<Self, Error> {
 		<Compact<u32>>::decode(input).and_then(move |Compact(len)| {
 			input.descend_ref()?;
@@ -1311,6 +1336,8 @@ impl_encode_for_collection! {
 }
 
 impl<T: Decode> Decode for LinkedList<T> {
+	const ENCODED_FIXED_SIZE: Option<usize> = None;
+
 	fn decode<I: Input>(input: &mut I) -> Result<Self, Error> {
 		<Compact<u32>>::decode(input).and_then(move |Compact(len)| {
 			input.descend_ref()?;
@@ -1336,6 +1363,8 @@ impl_encode_for_collection! {
 }
 
 impl<T: Decode + Ord> Decode for BinaryHeap<T> {
+	const ENCODED_FIXED_SIZE: Option<usize> = None;
+
 	fn decode<I: Input>(input: &mut I) -> Result<Self, Error> {
 		Ok(Vec::decode(input)?.into())
 	}
@@ -1363,6 +1392,8 @@ impl<T: Encode> Encode for VecDeque<T> {
 }
 
 impl<T: Decode> Decode for VecDeque<T> {
+	const ENCODED_FIXED_SIZE: Option<usize> = None;
+
 	fn decode<I: Input>(input: &mut I) -> Result<Self, Error> {
 		Ok(<Vec<T>>::decode(input)?.into())
 	}
@@ -1385,6 +1416,8 @@ impl Encode for () {
 }
 
 impl Decode for () {
+	const ENCODED_FIXED_SIZE: Option<usize> = Some(0);
+
 	fn decode<I: Input>(_: &mut I) -> Result<(), Error> {
 		Ok(())
 	}
@@ -1427,6 +1460,8 @@ macro_rules! tuple_impl {
 		}
 
 		impl<$one: Decode> Decode for ($one,) {
+			const ENCODED_FIXED_SIZE: Option<usize> = <$one>::ENCODED_FIXED_SIZE;
+
 			fn decode<I: Input>(input: &mut I) -> Result<Self, Error> {
 				match $one::decode(input) {
 					Err(e) => Err(e),
@@ -1466,6 +1501,29 @@ macro_rules! tuple_impl {
 		}
 
 		impl<$first: Decode, $($rest: Decode),+> Decode for ($first, $($rest),+) {
+			const ENCODED_FIXED_SIZE: Option<usize> = {
+				let mut size = 0;
+				let mut err = 0;
+				if let Some(n) = <$first>::ENCODED_FIXED_SIZE {
+					size += n;
+				} else {
+					err += 1;
+				}
+				$(
+					if let Some(n) = <$rest>::ENCODED_FIXED_SIZE {
+						size += n;
+					} else {
+						err += 1;
+					}
+				)+
+
+				if err > 0 {
+					None
+				} else {
+					Some(size)
+				}
+			};
+
 			fn decode<INPUT: Input>(input: &mut INPUT) -> Result<Self, super::Error> {
 				Ok((
 					match $first::decode(input) {
@@ -1540,15 +1598,14 @@ macro_rules! impl_endians {
 		impl Decode for $t {
 			const TYPE_INFO: TypeInfo = TypeInfo::$ty_info;
 
+			const ENCODED_FIXED_SIZE: Option<usize> = Some(mem::size_of::<$t>());
+
 			fn decode<I: Input>(input: &mut I) -> Result<Self, Error> {
 				let mut buf = [0u8; mem::size_of::<$t>()];
 				input.read(&mut buf)?;
 				Ok(<$t>::from_le_bytes(buf))
 			}
 
-			fn encoded_fixed_size() -> Option<usize> {
-				Some(mem::size_of::<$t>())
-			}
 		}
 
 		impl DecodeWithMemTracking for $t {}
@@ -1572,6 +1629,8 @@ macro_rules! impl_one_byte {
 
 		impl Decode for $t {
 			const TYPE_INFO: TypeInfo = TypeInfo::$ty_info;
+
+			const ENCODED_FIXED_SIZE: Option<usize> = Some(mem::size_of::<$t>());
 
 			fn decode<I: Input>(input: &mut I) -> Result<Self, Error> {
 				Ok(input.read_byte()? as $t)
@@ -1600,6 +1659,8 @@ impl Encode for bool {
 }
 
 impl Decode for bool {
+	const ENCODED_FIXED_SIZE: Option<usize> = Some(1);
+
 	fn decode<I: Input>(input: &mut I) -> Result<Self, Error> {
 		let byte = input.read_byte()?;
 		match byte {
@@ -1607,10 +1668,6 @@ impl Decode for bool {
 			1 => Ok(true),
 			_ => Err("Invalid boolean representation".into()),
 		}
-	}
-
-	fn encoded_fixed_size() -> Option<usize> {
-		Some(1)
 	}
 }
 
@@ -1629,6 +1686,8 @@ impl Encode for Duration {
 }
 
 impl Decode for Duration {
+	const ENCODED_FIXED_SIZE: Option<usize> = <(u64, u32)>::ENCODED_FIXED_SIZE;
+
 	fn decode<I: Input>(input: &mut I) -> Result<Self, Error> {
 		let (secs, nanos) = <(u64, u32)>::decode(input)
 			.map_err(|e| e.chain("Could not decode `Duration(u64, u32)`"))?;
@@ -1661,6 +1720,9 @@ impl<T> Decode for Range<T>
 where
 	T: Decode,
 {
+	const ENCODED_FIXED_SIZE: Option<usize> =
+		if let Some(s) = T::ENCODED_FIXED_SIZE { Some(s * 2) } else { None };
+
 	fn decode<I: Input>(input: &mut I) -> Result<Self, Error> {
 		let (start, end) =
 			<(T, T)>::decode(input).map_err(|e| e.chain("Could not decode `Range<T>`"))?;
@@ -1687,6 +1749,9 @@ impl<T> Decode for RangeInclusive<T>
 where
 	T: Decode,
 {
+	const ENCODED_FIXED_SIZE: Option<usize> =
+		if let Some(s) = T::ENCODED_FIXED_SIZE { Some(s * 2) } else { None };
+
 	fn decode<I: Input>(input: &mut I) -> Result<Self, Error> {
 		let (start, end) =
 			<(T, T)>::decode(input).map_err(|e| e.chain("Could not decode `RangeInclusive<T>`"))?;
@@ -2199,5 +2264,11 @@ mod tests {
 		let range_inclusive_bytes = (1, 100).encode();
 		assert_eq!(range_inclusive.encode(), range_inclusive_bytes);
 		assert_eq!(RangeInclusive::decode(&mut &range_inclusive_bytes[..]), Ok(range_inclusive));
+	}
+
+	#[test]
+	fn fixed_encode_sizes() {
+		assert!(u32::ENCODED_FIXED_SIZE == Some(4));
+		assert!(<[u32; 5]>::ENCODED_FIXED_SIZE == Some(4 * 5));
 	}
 }

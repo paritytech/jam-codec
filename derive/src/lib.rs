@@ -232,14 +232,13 @@ pub fn decode_derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream 
 	let impl_block = quote! {
 		#[automatically_derived]
 		impl #impl_generics #crate_path::Decode for #name #ty_generics #where_clause {
+			const ENCODED_FIXED_SIZE: ::core::option::Option<usize> =
+				#encoded_fixed_size_into_body;
+
 			fn decode<__CodecInputEdqy: #crate_path::Input>(
 				#input_: &mut __CodecInputEdqy
 			) -> ::core::result::Result<Self, #crate_path::Error> {
 				#decoding
-			}
-
-			fn encoded_fixed_size() -> ::core::option::Option<usize> {
-				#encoded_fixed_size_into_body
 			}
 
 			#impl_decode_into

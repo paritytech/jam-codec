@@ -132,7 +132,7 @@ assert_eq!(EnumType::decode(&mut dz).ok(), None);
 use jam_codec::{Encode, Decode, Compact, HasCompact};
 
 #[derive(Debug, PartialEq, Encode, Decode)]
-struct Test1CompactHasCompact<T: HasCompact> {
+struct Test1CompactHasCompact<T: HasCompact + Decode> {
     #[codec(compact)]
     bar: T,
 }

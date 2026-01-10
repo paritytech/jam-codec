@@ -191,17 +191,19 @@ pub fn quote_decode_into(
 pub fn quote_encoded_fixed_size(data: &Data, crate_path: &syn::Path) -> TokenStream {
 	let fields: Box<dyn Iterator<Item = &Field>> = match data {
 		Data::Struct(data) => Box::new(data.fields.iter()),
-		Data::Enum(data) => {
-			let variants = match utils::try_get_variants(data) {
-				Ok(variants) => variants,
-				Err(e) => return e.to_compile_error(),
-			};
+		Data::Enum(_) => {
+			// TODO impl
+			return quote! { None };
+			//let variants = match utils::try_get_variants(data) {
+			//	Ok(variants) => variants,
+			//	Err(e) => return e.to_compile_error(),
+			//};
 
-			let mut fields: Box<dyn Iterator<Item = &Field>> = Box::new(iter::empty());
-			for variant in variants {
-				fields = Box::new(fields.chain(variant.fields.iter()));
-			}
-			fields
+			//let mut fields: Box<dyn Iterator<Item = &Field>> = Box::new(iter::empty());
+			//for variant in variants {
+			//	fields = Box::new(fields.chain(variant.fields.iter()));
+			//}
+			//fields
 		},
 		Data::Union(_) =>
 			return Error::new(Span::call_site(), "Union types are not supported.")
@@ -222,9 +224,11 @@ pub fn quote_encoded_fixed_size(data: &Data, crate_path: &syn::Path) -> TokenStr
 		};
 
 		encoded_size_fields.push(quote! {{
-			const FIELD_LEN: ::core::option::Option<usize> =  <#quoted_field_type as #crate_path::Decode>::encoded_fixed_size();
-			if let Some(len) = FIELD_LEN {
+			// TODO a bounded variant for enum
+			if let Some(len) = <#quoted_field_type as #crate_path::Decode>::ENCODED_FIXED_SIZE {
 				size += len;
+			} else {
+				err += 1;
 			}
 		}});
 	}
@@ -233,13 +237,18 @@ pub fn quote_encoded_fixed_size(data: &Data, crate_path: &syn::Path) -> TokenStr
 		return quote! { Some(0usize) }
 	}
 
-	quote! {
+	quote! {{
 		let mut size: usize = 0;
+		let mut err: usize = 0;
 
 		#(#encoded_size_fields)*
 
-		return Some(size);
-	}
+		if err > 0 {
+			None
+		} else {
+			Some(size)
+		}
+	}}
 }
 
 fn create_decode_expr(

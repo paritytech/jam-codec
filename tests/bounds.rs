@@ -18,12 +18,12 @@ use jam_codec_derive::{Decode as DeriveDecode, Encode as DeriveEncode};
 #[test]
 fn ensure_derive_macro_derives_bounds_correctly() {
 	#[derive(DeriveEncode, DeriveDecode)]
-	pub struct Header<Number> {
+	pub struct Header<Number: Decode> {
 		#[codec(compact)]
 		pub number: Number,
 	}
 
 	trait _IsEncodeDecode: Encode + Decode {}
 
-	impl<Number: HasCompact> _IsEncodeDecode for Header<Number> {}
+	impl<Number: HasCompact + Decode> _IsEncodeDecode for Header<Number> {}
 }
