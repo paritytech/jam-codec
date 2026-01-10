@@ -138,11 +138,7 @@ where
 	T: CompactAs,
 	Compact<T::As>: Decode,
 {
-	const ENCODED_FIXED_SIZE: Option<usize> = if std::mem::size_of::<T>() == 0 {
-		Some(0)
-	} else {
-		None
-	};
+	const ENCODED_FIXED_SIZE: Option<usize> = Compact::<T::As>::ENCODED_FIXED_SIZE;
 
 	fn decode<I: Input>(input: &mut I) -> Result<Self, Error> {
 		let as_ = Compact::<T::As>::decode(input)?;
@@ -298,7 +294,7 @@ where
 	T: Copy + TryFrom<u64>,
 {
 	const ENCODED_FIXED_SIZE: Option<usize> = if std::mem::size_of::<T>() == 0 {
-		Some(0)
+		Some(1)
 	} else {
 		None
 	};
