@@ -224,7 +224,6 @@ pub fn quote_encoded_fixed_size(data: &Data, crate_path: &syn::Path) -> TokenStr
 		};
 
 		encoded_size_fields.push(quote! {{
-			// TODO a bounded variant for enum
 			if let Some(len) = <#quoted_field_type as #crate_path::Decode>::ENCODED_FIXED_SIZE {
 				size += len;
 			} else {
