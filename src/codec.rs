@@ -828,8 +828,11 @@ macro_rules! impl_for_non_zero {
 			impl EncodeLike for $name {}
 
 			impl Decode for $name {
-				// TODO incorrect: need to use inner type of NonZero: read code
-				const ENCODED_FIXED_SIZE: Option<usize> = Some(::core::mem::size_of::<Self>());
+				const ENCODED_FIXED_SIZE: Option<usize> = if Self::BITS % 8 == 0 {
+					unimplemented!()
+				} else {
+					Some(Self::BITS as usize / 8)
+				};
 
 				fn decode<I: Input>(input: &mut I) -> Result<Self, Error> {
 					Self::new(Decode::decode(input)?)
