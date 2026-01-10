@@ -138,8 +138,11 @@ where
 	T: CompactAs,
 	Compact<T::As>: Decode,
 {
-	// TODO read code
-	const ENCODED_FIXED_SIZE: Option<usize> = None;
+	const ENCODED_FIXED_SIZE: Option<usize> = if std::mem::size_of::<T>() == 0 {
+		Some(0)
+	} else {
+		None
+	};
 
 	fn decode<I: Input>(input: &mut I) -> Result<Self, Error> {
 		let as_ = Compact::<T::As>::decode(input)?;
@@ -294,8 +297,11 @@ impl<T> Decode for WrappedPrimitive<T>
 where
 	T: Copy + TryFrom<u64>,
 {
-	// TODO read code
-	const ENCODED_FIXED_SIZE: Option<usize> = None;
+	const ENCODED_FIXED_SIZE: Option<usize> = if std::mem::size_of::<T>() == 0 {
+		Some(0)
+	} else {
+		None
+	};
 
 	fn decode<I: Input>(input: &mut I) -> Result<Self, Error> {
 		const OUT_OF_RANGE: &str = "Out of range";
@@ -417,8 +423,7 @@ impl CompactLen<u128> for Compact<u128> {
 }
 
 impl Decode for Compact<()> {
-	// TODO read code
-	const ENCODED_FIXED_SIZE: Option<usize> = None;
+	const ENCODED_FIXED_SIZE: Option<usize> = Some(0);
 
 	fn decode<I: Input>(_input: &mut I) -> Result<Self, Error> {
 		Ok(Compact(()))
@@ -428,7 +433,6 @@ impl Decode for Compact<()> {
 impl DecodeWithMemTracking for Compact<()> {}
 
 impl Decode for Compact<u8> {
-	// TODO read code
 	const ENCODED_FIXED_SIZE: Option<usize> = None;
 
 	fn decode<I: Input>(input: &mut I) -> Result<Self, Error> {
@@ -439,7 +443,6 @@ impl Decode for Compact<u8> {
 impl DecodeWithMemTracking for Compact<u8> {}
 
 impl Decode for Compact<u16> {
-	// TODO read code
 	const ENCODED_FIXED_SIZE: Option<usize> = None;
 
 	fn decode<I: Input>(input: &mut I) -> Result<Self, Error> {
@@ -450,7 +453,6 @@ impl Decode for Compact<u16> {
 impl DecodeWithMemTracking for Compact<u16> {}
 
 impl Decode for Compact<u32> {
-	// TODO read code
 	const ENCODED_FIXED_SIZE: Option<usize> = None;
 
 	fn decode<I: Input>(input: &mut I) -> Result<Self, Error> {
@@ -461,7 +463,6 @@ impl Decode for Compact<u32> {
 impl DecodeWithMemTracking for Compact<u32> {}
 
 impl Decode for Compact<u64> {
-	// TODO read code
 	const ENCODED_FIXED_SIZE: Option<usize> = None;
 
 	fn decode<I: Input>(input: &mut I) -> Result<Self, Error> {
@@ -472,7 +473,6 @@ impl Decode for Compact<u64> {
 impl DecodeWithMemTracking for Compact<u64> {}
 
 impl Decode for Compact<u128> {
-	// TODO read code
 	const ENCODED_FIXED_SIZE: Option<usize> = None;
 
 	fn decode<I: Input>(input: &mut I) -> Result<Self, Error> {
