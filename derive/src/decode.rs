@@ -189,21 +189,28 @@ pub fn quote_decode_into(
 }
 
 pub fn quote_encoded_fixed_size(data: &Data, crate_path: &syn::Path) -> TokenStream {
+
+	quote_opt_const_size(data, crate_path, quote!{ ENCODED_FIXED_SIZE })
+}
+
+pub fn quote_encoded_min_bound(data: &Data, crate_path: &syn::Path) -> TokenStream {
+	quote_opt_const_size(data, crate_path, quote!{ ENCODED_MIN_BOUND })
+	}
+
+pub fn quote_encoded_max_bound(data: &Data, crate_path: &syn::Path) -> TokenStream {
+	quote_opt_const_size(data, crate_path, quote!{ ENCODED_MAX_BOUND })
+}
+
+fn quote_opt_const_size(
+	data: &Data,
+	crate_path: &syn::Path,
+	const_name: TokenStream,
+) -> TokenStream {
 	let fields: Box<dyn Iterator<Item = &Field>> = match data {
 		Data::Struct(data) => Box::new(data.fields.iter()),
 		Data::Enum(_) => {
 			// TODO impl
-			return quote! { None };
-			//let variants = match utils::try_get_variants(data) {
-			//	Ok(variants) => variants,
-			//	Err(e) => return e.to_compile_error(),
-			//};
-
-			//let mut fields: Box<dyn Iterator<Item = &Field>> = Box::new(iter::empty());
-			//for variant in variants {
-			//	fields = Box::new(fields.chain(variant.fields.iter()));
-			//}
-			//fields
+			return quote! { None }
 		},
 		Data::Union(_) =>
 			return Error::new(Span::call_site(), "Union types are not supported.")
@@ -224,7 +231,7 @@ pub fn quote_encoded_fixed_size(data: &Data, crate_path: &syn::Path) -> TokenStr
 		};
 
 		encoded_size_fields.push(quote! {{
-			if let Some(len) = <#quoted_field_type as #crate_path::Decode>::ENCODED_FIXED_SIZE {
+			if let Some(len) = <#quoted_field_type as #crate_path::Decode>::#const_name {
 				size += len;
 			} else {
 				err += 1;

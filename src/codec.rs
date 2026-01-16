@@ -305,7 +305,16 @@ pub trait Decode: Sized {
 	/// type have the given size (in bytes) when encoded.
 	///
 	/// NOTE: A type with a fixed encoded size may define `None`.
-	const ENCODED_FIXED_SIZE: Option<usize>;
+	const ENCODED_FIXED_SIZE: Option<usize> = loop {
+		if let Some(max) = Self::ENCODED_MAX_BOUND {
+			if let Some(min) = Self::ENCODED_MIN_BOUND {
+				if max == min {
+					break Some(max)
+				}
+			}
+			break None
+		}
+	};
 
 	/// The maximum fixed encoded size of the type.
 	///
@@ -315,7 +324,7 @@ pub trait Decode: Sized {
 	/// The minimum fixed encoded size of the type. Mostly informative.
 	///
 	/// NOTE: A type with a fixed encoded size may define `None`.
-	const ENCODED_LOW_BOUND: Option<usize> = None;
+	const ENCODED_MIN_BOUND: Option<usize> = None;
 
 	/// Attempt to deserialise the value from input.
 	fn decode<I: Input>(input: &mut I) -> Result<Self, Error>;

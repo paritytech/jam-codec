@@ -216,6 +216,12 @@ pub fn decode_derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream 
 	let encoded_fixed_size_into_body =
 		decode::quote_encoded_fixed_size(&input.data, &crate_path);
 
+	let encoded_max_bound_into_body =
+		decode::quote_encoded_max_bound(&input.data, &crate_path);
+
+	let encoded_min_bound_into_body =
+		decode::quote_encoded_min_bound(&input.data, &crate_path);
+
 	let impl_decode_into = if let Some(body) = decode_into_body {
 		quote! {
 			fn decode_into<__CodecInputEdqy: #crate_path::Input>(
@@ -234,6 +240,13 @@ pub fn decode_derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream 
 		impl #impl_generics #crate_path::Decode for #name #ty_generics #where_clause {
 			const ENCODED_FIXED_SIZE: ::core::option::Option<usize> =
 				#encoded_fixed_size_into_body;
+
+			const ENCODED_MAX_BOUND: ::core::option::Option<usize> =
+				#encoded_max_bound_into_body;
+
+			const ENCODED_MIN_BOUND: ::core::option::Option<usize> =
+				#encoded_min_bound_into_body;
+
 
 			fn decode<__CodecInputEdqy: #crate_path::Input>(
 				#input_: &mut __CodecInputEdqy
