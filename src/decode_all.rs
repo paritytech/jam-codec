@@ -84,7 +84,6 @@ mod tests {
 	}
 
 	impl Decode for TestStruct {
-		const ENCODED_FIXED_SIZE: Option<usize> = None;
 		const ENCODED_MAX_BOUND: Option<usize> = None;
 		const ENCODED_MIN_BOUND: Option<usize> = None;
 
