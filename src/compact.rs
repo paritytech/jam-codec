@@ -295,11 +295,8 @@ impl<T> Decode for WrappedPrimitive<T>
 where
 	T: Copy + TryFrom<u64>,
 {
-	const ENCODED_FIXED_SIZE: Option<usize> = if std::mem::size_of::<T>() == 0 {
-		Some(1)
-	} else {
-		None
-	};
+	const ENCODED_FIXED_SIZE: Option<usize> =
+		if std::mem::size_of::<T>() == 0 { Some(1) } else { None };
 	// TODO
 	const ENCODED_MAX_BOUND: Option<usize> = Self::ENCODED_FIXED_SIZE;
 	// TODO
@@ -437,11 +434,8 @@ impl Decode for Compact<()> {
 impl DecodeWithMemTracking for Compact<()> {}
 
 impl Decode for Compact<u8> {
-	const ENCODED_FIXED_SIZE: Option<usize> = None;
-	// TODO
-	const ENCODED_MAX_BOUND: Option<usize> = None;
-	// TODO
-	const ENCODED_MIN_BOUND: Option<usize> = None;
+	const ENCODED_MAX_BOUND: Option<usize> = Some(2);
+	const ENCODED_MIN_BOUND: Option<usize> = Some(1);
 
 	fn decode<I: Input>(input: &mut I) -> Result<Self, Error> {
 		WrappedPrimitive::<u8>::decode(input).map(|w| Compact(w.0))
@@ -451,11 +445,8 @@ impl Decode for Compact<u8> {
 impl DecodeWithMemTracking for Compact<u8> {}
 
 impl Decode for Compact<u16> {
-	const ENCODED_FIXED_SIZE: Option<usize> = None;
-	// TODO
-	const ENCODED_MAX_BOUND: Option<usize> = None;
-	// TODO
-	const ENCODED_MIN_BOUND: Option<usize> = None;
+	const ENCODED_MAX_BOUND: Option<usize> = Some(3);
+	const ENCODED_MIN_BOUND: Option<usize> = Some(1);
 
 	fn decode<I: Input>(input: &mut I) -> Result<Self, Error> {
 		WrappedPrimitive::<u16>::decode(input).map(|w| Compact(w.0))
@@ -465,11 +456,8 @@ impl Decode for Compact<u16> {
 impl DecodeWithMemTracking for Compact<u16> {}
 
 impl Decode for Compact<u32> {
-	const ENCODED_FIXED_SIZE: Option<usize> = None;
-	// TODO
-	const ENCODED_MAX_BOUND: Option<usize> = None;
-	// TODO
-	const ENCODED_MIN_BOUND: Option<usize> = None;
+	const ENCODED_MAX_BOUND: Option<usize> = Some(5);
+	const ENCODED_MIN_BOUND: Option<usize> = Some(1);
 
 	fn decode<I: Input>(input: &mut I) -> Result<Self, Error> {
 		WrappedPrimitive::<u32>::decode(input).map(|w| Compact(w.0))
@@ -479,11 +467,8 @@ impl Decode for Compact<u32> {
 impl DecodeWithMemTracking for Compact<u32> {}
 
 impl Decode for Compact<u64> {
-	const ENCODED_FIXED_SIZE: Option<usize> = None;
-	// TODO
-	const ENCODED_MAX_BOUND: Option<usize> = None;
-	// TODO
-	const ENCODED_MIN_BOUND: Option<usize> = None;
+	const ENCODED_MAX_BOUND: Option<usize> = Some(9);
+	const ENCODED_MIN_BOUND: Option<usize> = Some(1);
 
 	fn decode<I: Input>(input: &mut I) -> Result<Self, Error> {
 		WrappedPrimitive::<u64>::decode(input).map(|w| Compact(w.0))
@@ -493,11 +478,8 @@ impl Decode for Compact<u64> {
 impl DecodeWithMemTracking for Compact<u64> {}
 
 impl Decode for Compact<u128> {
-	const ENCODED_FIXED_SIZE: Option<usize> = None;
-	// TODO
-	const ENCODED_MAX_BOUND: Option<usize> = None;
-	// TODO
-	const ENCODED_MIN_BOUND: Option<usize> = None;
+	const ENCODED_MAX_BOUND: Option<usize> = Some(18);
+	const ENCODED_MIN_BOUND: Option<usize> = Some(2);
 
 	fn decode<I: Input>(input: &mut I) -> Result<Self, Error> {
 		let l = WrappedPrimitive::<u64>::decode(input).map(|w| Compact(w.0))?.0;
@@ -716,19 +698,20 @@ mod tests {
 		let _data = WithCompact { _data: Wrapper(1) };
 	}
 
+	macro_rules! check_usinge_encoded_arrays {
+		( $( $t:ty ),+ ) => {
+			$(
+		Compact(<$t>::MAX)
+			.using_encoded(|e| assert_eq!(Compact::<$t>::ENCODED_MAX_BOUND.unwrap(), e.len()));
+		Compact::<$t>(0)
+			.using_encoded(|e| assert_eq!(Compact::<$t>::ENCODED_MIN_BOUND.unwrap(), e.len()));
+		CompactRef(&<$t>::MAX).using_encoded(|_| {});
+			)*
+		};
+	}
 	#[test]
-	fn compact_using_encoded_arrayvec_size() {
-		Compact(u8::MAX).using_encoded(|_| {});
-		Compact(u16::MAX).using_encoded(|_| {});
-		Compact(u32::MAX).using_encoded(|_| {});
-		Compact(u64::MAX).using_encoded(|_| {});
-		Compact(u128::MAX).using_encoded(|_| {});
-
-		CompactRef(&u8::MAX).using_encoded(|_| {});
-		CompactRef(&u16::MAX).using_encoded(|_| {});
-		CompactRef(&u32::MAX).using_encoded(|_| {});
-		CompactRef(&u64::MAX).using_encoded(|_| {});
-		CompactRef(&u128::MAX).using_encoded(|_| {});
+	fn compact_using_encoded_arrayvec_size_and_primitives_bound() {
+		check_usinge_encoded_arrays!(u8, u16, u32, u64, u128);
 	}
 
 	#[test]
