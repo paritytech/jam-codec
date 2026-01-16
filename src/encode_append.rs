@@ -212,6 +212,8 @@ mod tests {
 
 		impl Decode for NoCopy {
 			const ENCODED_FIXED_SIZE: Option<usize> = u32::ENCODED_FIXED_SIZE;
+			const ENCODED_MAX_BOUND: Option<usize> = u32::ENCODED_MAX_BOUND;
+			const ENCODED_MIN_BOUND: Option<usize> = u32::ENCODED_MIN_BOUND;
 
 			fn decode<I: Input>(input: &mut I) -> Result<Self, Error> {
 				u32::decode(input).map(|data| Self { data })

@@ -139,6 +139,8 @@ where
 	Compact<T::As>: Decode,
 {
 	const ENCODED_FIXED_SIZE: Option<usize> = Compact::<T::As>::ENCODED_FIXED_SIZE;
+	const ENCODED_MAX_BOUND: Option<usize> = Compact::<T::As>::ENCODED_MAX_BOUND;
+	const ENCODED_MIN_BOUND: Option<usize> = Compact::<T::As>::ENCODED_MIN_BOUND;
 
 	fn decode<I: Input>(input: &mut I) -> Result<Self, Error> {
 		let as_ = Compact::<T::As>::decode(input)?;
@@ -298,6 +300,10 @@ where
 	} else {
 		None
 	};
+	// TODO
+	const ENCODED_MAX_BOUND: Option<usize> = Self::ENCODED_FIXED_SIZE;
+	// TODO
+	const ENCODED_MIN_BOUND: Option<usize> = Self::ENCODED_FIXED_SIZE;
 
 	fn decode<I: Input>(input: &mut I) -> Result<Self, Error> {
 		const OUT_OF_RANGE: &str = "Out of range";
@@ -420,6 +426,8 @@ impl CompactLen<u128> for Compact<u128> {
 
 impl Decode for Compact<()> {
 	const ENCODED_FIXED_SIZE: Option<usize> = Some(0);
+	const ENCODED_MAX_BOUND: Option<usize> = Some(0);
+	const ENCODED_MIN_BOUND: Option<usize> = Some(0);
 
 	fn decode<I: Input>(_input: &mut I) -> Result<Self, Error> {
 		Ok(Compact(()))
@@ -430,6 +438,10 @@ impl DecodeWithMemTracking for Compact<()> {}
 
 impl Decode for Compact<u8> {
 	const ENCODED_FIXED_SIZE: Option<usize> = None;
+	// TODO
+	const ENCODED_MAX_BOUND: Option<usize> = None;
+	// TODO
+	const ENCODED_MIN_BOUND: Option<usize> = None;
 
 	fn decode<I: Input>(input: &mut I) -> Result<Self, Error> {
 		WrappedPrimitive::<u8>::decode(input).map(|w| Compact(w.0))
@@ -440,6 +452,10 @@ impl DecodeWithMemTracking for Compact<u8> {}
 
 impl Decode for Compact<u16> {
 	const ENCODED_FIXED_SIZE: Option<usize> = None;
+	// TODO
+	const ENCODED_MAX_BOUND: Option<usize> = None;
+	// TODO
+	const ENCODED_MIN_BOUND: Option<usize> = None;
 
 	fn decode<I: Input>(input: &mut I) -> Result<Self, Error> {
 		WrappedPrimitive::<u16>::decode(input).map(|w| Compact(w.0))
@@ -450,6 +466,10 @@ impl DecodeWithMemTracking for Compact<u16> {}
 
 impl Decode for Compact<u32> {
 	const ENCODED_FIXED_SIZE: Option<usize> = None;
+	// TODO
+	const ENCODED_MAX_BOUND: Option<usize> = None;
+	// TODO
+	const ENCODED_MIN_BOUND: Option<usize> = None;
 
 	fn decode<I: Input>(input: &mut I) -> Result<Self, Error> {
 		WrappedPrimitive::<u32>::decode(input).map(|w| Compact(w.0))
@@ -460,6 +480,10 @@ impl DecodeWithMemTracking for Compact<u32> {}
 
 impl Decode for Compact<u64> {
 	const ENCODED_FIXED_SIZE: Option<usize> = None;
+	// TODO
+	const ENCODED_MAX_BOUND: Option<usize> = None;
+	// TODO
+	const ENCODED_MIN_BOUND: Option<usize> = None;
 
 	fn decode<I: Input>(input: &mut I) -> Result<Self, Error> {
 		WrappedPrimitive::<u64>::decode(input).map(|w| Compact(w.0))
@@ -470,6 +494,10 @@ impl DecodeWithMemTracking for Compact<u64> {}
 
 impl Decode for Compact<u128> {
 	const ENCODED_FIXED_SIZE: Option<usize> = None;
+	// TODO
+	const ENCODED_MAX_BOUND: Option<usize> = None;
+	// TODO
+	const ENCODED_MIN_BOUND: Option<usize> = None;
 
 	fn decode<I: Input>(input: &mut I) -> Result<Self, Error> {
 		let l = WrappedPrimitive::<u64>::decode(input).map(|w| Compact(w.0))?.0;

@@ -53,6 +53,8 @@ const ARCH32BIT_BITSLICE_MAX_BITS: usize = 0x1fff_ffff;
 
 impl<O: BitOrder, T: BitStore + Decode> Decode for BitVec<T, O> {
 	const ENCODED_FIXED_SIZE: Option<usize> = None;
+	const ENCODED_MAX_BOUND: Option<usize> = None;
+	const ENCODED_MIN_BOUND: Option<usize> = Some(1);
 
 	fn decode<I: Input>(input: &mut I) -> Result<Self, Error> {
 		<Compact<u32>>::decode(input).and_then(move |Compact(bits)| {
@@ -88,7 +90,9 @@ impl<O: BitOrder, T: BitStore + Encode> Encode for BitBox<T, O> {
 impl<O: BitOrder, T: BitStore + Encode> EncodeLike for BitBox<T, O> {}
 
 impl<O: BitOrder, T: BitStore + Decode> Decode for BitBox<T, O> {
-	const ENCODED_FIXED_SIZE: Option<usize> = None;
+	const ENCODED_FIXED_SIZE: Option<usize> = BitVec::<T, O>::ENCODED_FIXED_SIZE;
+	const ENCODED_MIN_BOUND: Option<usize> =  BitVec::<T, O>::ENCODED_MIN_BOUND;
+	const ENCODED_MAX_BOUND: Option<usize> = BitVec::<T, O>::ENCODED_MAX_BOUND;
 
 	fn decode<I: Input>(input: &mut I) -> Result<Self, Error> {
 		Ok(BitVec::<T, O>::decode(input)?.into())

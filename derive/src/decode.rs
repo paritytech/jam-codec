@@ -189,16 +189,15 @@ pub fn quote_decode_into(
 }
 
 pub fn quote_encoded_fixed_size(data: &Data, crate_path: &syn::Path) -> TokenStream {
-
-	quote_opt_const_size(data, crate_path, quote!{ ENCODED_FIXED_SIZE })
+	quote_opt_const_size(data, crate_path, quote! { ENCODED_FIXED_SIZE })
 }
 
 pub fn quote_encoded_min_bound(data: &Data, crate_path: &syn::Path) -> TokenStream {
-	quote_opt_const_size(data, crate_path, quote!{ ENCODED_MIN_BOUND })
-	}
+	quote_opt_const_size(data, crate_path, quote! { ENCODED_MIN_BOUND })
+}
 
 pub fn quote_encoded_max_bound(data: &Data, crate_path: &syn::Path) -> TokenStream {
-	quote_opt_const_size(data, crate_path, quote!{ ENCODED_MAX_BOUND })
+	quote_opt_const_size(data, crate_path, quote! { ENCODED_MAX_BOUND })
 }
 
 fn quote_opt_const_size(

@@ -319,12 +319,12 @@ pub trait Decode: Sized {
 	/// The maximum fixed encoded size of the type.
 	///
 	/// NOTE: A type with a fixed encoded size may define `None`.
-	const ENCODED_MAX_BOUND: Option<usize> = None;
+	const ENCODED_MAX_BOUND: Option<usize>;
 
 	/// The minimum fixed encoded size of the type. Mostly informative.
 	///
 	/// NOTE: A type with a fixed encoded size may define `None`.
-	const ENCODED_MIN_BOUND: Option<usize> = None;
+	const ENCODED_MIN_BOUND: Option<usize>;
 
 	/// Attempt to deserialise the value from input.
 	fn decode<I: Input>(input: &mut I) -> Result<Self, Error>;
@@ -650,6 +650,8 @@ where
 	X: WrapperTypeDecode<Wrapped = T>,
 {
 	const ENCODED_FIXED_SIZE: Option<usize> = <T as Decode>::ENCODED_FIXED_SIZE;
+	const ENCODED_MAX_BOUND: Option<usize> = <T as Decode>::ENCODED_MAX_BOUND;
+	const ENCODED_MIN_BOUND: Option<usize> = <T as Decode>::ENCODED_MIN_BOUND;
 
 	#[inline]
 	fn decode<I: Input>(input: &mut I) -> Result<Self, Error> {
@@ -722,7 +724,9 @@ where
 
 impl<T: Decode, E: Decode> Decode for Result<T, E> {
 	// TODO max R E + 1
-	const ENCODED_FIXED_SIZE: Option<usize> = None;
+	const ENCODED_MAX_BOUND: Option<usize> = <T as Decode>::ENCODED_MAX_BOUND;
+	// TODO min R E + 1
+	const ENCODED_MIN_BOUND: Option<usize> = <T as Decode>::ENCODED_MIN_BOUND;
 
 	fn decode<I: Input>(input: &mut I) -> Result<Self, Error> {
 		match input
@@ -768,6 +772,8 @@ impl EncodeLike for OptionBool {}
 
 impl Decode for OptionBool {
 	const ENCODED_FIXED_SIZE: Option<usize> = Some(1);
+	const ENCODED_MAX_BOUND: Option<usize> = Some(1);
+	const ENCODED_MIN_BOUND: Option<usize> = Some(1);
 
 	fn decode<I: Input>(input: &mut I) -> Result<Self, Error> {
 		match input.read_byte()? {
@@ -805,6 +811,10 @@ impl<T: Encode> Encode for Option<T> {
 impl<T: Decode> Decode for Option<T> {
 	const ENCODED_FIXED_SIZE: Option<usize> =
 		if let Some(s) = T::ENCODED_FIXED_SIZE { Some(s + 1) } else { None };
+	const ENCODED_MAX_BOUND: Option<usize> =
+		if let Some(m) = T::ENCODED_MAX_BOUND { Some(m + 1) } else { None };
+	const ENCODED_MIN_BOUND: Option<usize> =
+		if let Some(m) = T::ENCODED_MIN_BOUND { Some(m + 1) } else { None };
 
 	fn decode<I: Input>(input: &mut I) -> Result<Self, Error> {
 		match input
@@ -847,10 +857,12 @@ macro_rules! impl_for_non_zero {
 
 			impl Decode for $name {
 				const ENCODED_FIXED_SIZE: Option<usize> = if Self::BITS % 8 == 0 {
-					unimplemented!()
-				} else {
 					Some(Self::BITS as usize / 8)
+				} else {
+					unimplemented!()
 				};
+				const ENCODED_MAX_BOUND: Option<usize> = Self::ENCODED_FIXED_SIZE;
+				const ENCODED_MIN_BOUND: Option<usize> = Self::ENCODED_FIXED_SIZE;
 
 				fn decode<I: Input>(input: &mut I) -> Result<Self, Error> {
 					Self::new(Decode::decode(input)?)
@@ -943,6 +955,10 @@ impl<T: Decode, const N: usize> Decode for [T; N] {
 		} else {
 			None
 		};
+	const ENCODED_MAX_BOUND: Option<usize> =
+		if let Some(m) = <T as Decode>::ENCODED_MAX_BOUND { Some(m * N) } else { None };
+	const ENCODED_MIN_BOUND: Option<usize> =
+		if let Some(m) = <T as Decode>::ENCODED_MIN_BOUND { Some(m * N) } else { None };
 
 	#[inline(always)]
 	fn decode<I: Input>(input: &mut I) -> Result<Self, Error> {
@@ -1090,6 +1106,8 @@ where
 	<T as ToOwned>::Owned: Decode,
 {
 	const ENCODED_FIXED_SIZE: Option<usize> = <T as ToOwned>::Owned::ENCODED_FIXED_SIZE;
+	const ENCODED_MAX_BOUND: Option<usize> = <T as ToOwned>::Owned::ENCODED_MAX_BOUND;
+	const ENCODED_MIN_BOUND: Option<usize> = <T as ToOwned>::Owned::ENCODED_MIN_BOUND;
 
 	fn decode<I: Input>(input: &mut I) -> Result<Self, Error> {
 		Ok(Cow::Owned(Decode::decode(input)?))
@@ -1111,6 +1129,8 @@ impl<T> Encode for PhantomData<T> {
 
 impl<T> Decode for PhantomData<T> {
 	const ENCODED_FIXED_SIZE: Option<usize> = Some(0);
+	const ENCODED_MAX_BOUND: Option<usize> = Some(0);
+	const ENCODED_MIN_BOUND: Option<usize> = Some(0);
 
 	fn decode<I: Input>(_input: &mut I) -> Result<Self, Error> {
 		Ok(PhantomData)
@@ -1121,6 +1141,8 @@ impl<T> DecodeWithMemTracking for PhantomData<T> where PhantomData<T>: Decode {}
 
 impl Decode for String {
 	const ENCODED_FIXED_SIZE: Option<usize> = None;
+	const ENCODED_MAX_BOUND: Option<usize> = None;
+	const ENCODED_MIN_BOUND: Option<usize> = Some(1);
 
 	fn decode<I: Input>(input: &mut I) -> Result<Self, Error> {
 		Self::from_utf8(Vec::decode(input)?).map_err(|_| "Invalid utf8 sequence".into())
@@ -1268,6 +1290,8 @@ impl<T: EncodeLike<U>, U: Encode> EncodeLike<Vec<U>> for &[T] {}
 
 impl<T: Decode> Decode for Vec<T> {
 	const ENCODED_FIXED_SIZE: Option<usize> = None;
+	const ENCODED_MAX_BOUND: Option<usize> = None;
+	const ENCODED_MIN_BOUND: Option<usize> = Some(1);
 
 	fn decode<I: Input>(input: &mut I) -> Result<Self, Error> {
 		<Compact<u32>>::decode(input)
@@ -1314,6 +1338,9 @@ impl_encode_for_collection! {
 
 impl<K: Decode + Ord, V: Decode> Decode for BTreeMap<K, V> {
 	const ENCODED_FIXED_SIZE: Option<usize> = None;
+	const ENCODED_MAX_BOUND: Option<usize> = None;
+	const ENCODED_MIN_BOUND: Option<usize> = Some(1);
+
 
 	fn decode<I: Input>(input: &mut I) -> Result<Self, Error> {
 		<Compact<u32>>::decode(input).and_then(move |Compact(len)| {
@@ -1338,6 +1365,8 @@ impl_encode_for_collection! {
 
 impl<T: Decode + Ord> Decode for BTreeSet<T> {
 	const ENCODED_FIXED_SIZE: Option<usize> = None;
+	const ENCODED_MAX_BOUND: Option<usize> = None;
+	const ENCODED_MIN_BOUND: Option<usize> = Some(1);
 
 	fn decode<I: Input>(input: &mut I) -> Result<Self, Error> {
 		<Compact<u32>>::decode(input).and_then(move |Compact(len)| {
@@ -1358,6 +1387,8 @@ impl_encode_for_collection! {
 
 impl<T: Decode> Decode for LinkedList<T> {
 	const ENCODED_FIXED_SIZE: Option<usize> = None;
+	const ENCODED_MAX_BOUND: Option<usize> = None;
+	const ENCODED_MIN_BOUND: Option<usize> = Some(1);
 
 	fn decode<I: Input>(input: &mut I) -> Result<Self, Error> {
 		<Compact<u32>>::decode(input).and_then(move |Compact(len)| {
@@ -1384,7 +1415,9 @@ impl_encode_for_collection! {
 }
 
 impl<T: Decode + Ord> Decode for BinaryHeap<T> {
-	const ENCODED_FIXED_SIZE: Option<usize> = None;
+	const ENCODED_FIXED_SIZE: Option<usize> = <Vec<T>>::ENCODED_FIXED_SIZE;
+	const ENCODED_MAX_BOUND: Option<usize> = <Vec<T>>::ENCODED_MAX_BOUND;
+	const ENCODED_MIN_BOUND: Option<usize> =  <Vec<T>>::ENCODED_MIN_BOUND;
 
 	fn decode<I: Input>(input: &mut I) -> Result<Self, Error> {
 		Ok(Vec::decode(input)?.into())
@@ -1413,7 +1446,9 @@ impl<T: Encode> Encode for VecDeque<T> {
 }
 
 impl<T: Decode> Decode for VecDeque<T> {
-	const ENCODED_FIXED_SIZE: Option<usize> = None;
+	const ENCODED_FIXED_SIZE: Option<usize> = <Vec<T>>::ENCODED_FIXED_SIZE;
+	const ENCODED_MAX_BOUND: Option<usize> = <Vec<T>>::ENCODED_MAX_BOUND;
+	const ENCODED_MIN_BOUND: Option<usize> =  <Vec<T>>::ENCODED_MIN_BOUND;
 
 	fn decode<I: Input>(input: &mut I) -> Result<Self, Error> {
 		Ok(<Vec<T>>::decode(input)?.into())
@@ -1438,6 +1473,8 @@ impl Encode for () {
 
 impl Decode for () {
 	const ENCODED_FIXED_SIZE: Option<usize> = Some(0);
+	const ENCODED_MAX_BOUND: Option<usize> = Some(0);
+	const ENCODED_MIN_BOUND: Option<usize> = Some(0);
 
 	fn decode<I: Input>(_: &mut I) -> Result<(), Error> {
 		Ok(())
@@ -1482,6 +1519,8 @@ macro_rules! tuple_impl {
 
 		impl<$one: Decode> Decode for ($one,) {
 			const ENCODED_FIXED_SIZE: Option<usize> = <$one>::ENCODED_FIXED_SIZE;
+			const ENCODED_MAX_BOUND: Option<usize> = <$one>::ENCODED_MAX_BOUND;
+			const ENCODED_MIN_BOUND: Option<usize> = <$one>::ENCODED_MIN_BOUND;
 
 			fn decode<I: Input>(input: &mut I) -> Result<Self, Error> {
 				match $one::decode(input) {
@@ -1532,6 +1571,52 @@ macro_rules! tuple_impl {
 				}
 				$(
 					if let Some(n) = <$rest>::ENCODED_FIXED_SIZE {
+						size += n;
+					} else {
+						err += 1;
+					}
+				)+
+
+				if err > 0 {
+					None
+				} else {
+					Some(size)
+				}
+			};
+
+			const ENCODED_MAX_BOUND: Option<usize> = {
+				let mut size = 0;
+				let mut err = 0;
+				if let Some(n) = <$first>::ENCODED_MAX_BOUND {
+					size += n;
+				} else {
+					err += 1;
+				}
+				$(
+					if let Some(n) = <$rest>::ENCODED_MAX_BOUND {
+						size += n;
+					} else {
+						err += 1;
+					}
+				)+
+
+				if err > 0 {
+					None
+				} else {
+					Some(size)
+				}
+			};
+
+			const ENCODED_MIN_BOUND: Option<usize> = {
+				let mut size = 0;
+				let mut err = 0;
+				if let Some(n) = <$first>::ENCODED_MIN_BOUND {
+					size += n;
+				} else {
+					err += 1;
+				}
+				$(
+					if let Some(n) = <$rest>::ENCODED_MIN_BOUND {
 						size += n;
 					} else {
 						err += 1;
@@ -1620,6 +1705,8 @@ macro_rules! impl_endians {
 			const TYPE_INFO: TypeInfo = TypeInfo::$ty_info;
 
 			const ENCODED_FIXED_SIZE: Option<usize> = Some(mem::size_of::<$t>());
+			const ENCODED_MIN_BOUND: Option<usize> = Some(mem::size_of::<$t>());
+			const ENCODED_MAX_BOUND: Option<usize> = Some(mem::size_of::<$t>());
 
 			fn decode<I: Input>(input: &mut I) -> Result<Self, Error> {
 				let mut buf = [0u8; mem::size_of::<$t>()];
@@ -1652,6 +1739,8 @@ macro_rules! impl_one_byte {
 			const TYPE_INFO: TypeInfo = TypeInfo::$ty_info;
 
 			const ENCODED_FIXED_SIZE: Option<usize> = Some(mem::size_of::<$t>());
+			const ENCODED_MIN_BOUND: Option<usize> = Some(mem::size_of::<$t>());
+			const ENCODED_MAX_BOUND: Option<usize> = Some(mem::size_of::<$t>());
 
 			fn decode<I: Input>(input: &mut I) -> Result<Self, Error> {
 				Ok(input.read_byte()? as $t)
@@ -1681,6 +1770,8 @@ impl Encode for bool {
 
 impl Decode for bool {
 	const ENCODED_FIXED_SIZE: Option<usize> = Some(1);
+	const ENCODED_MAX_BOUND: Option<usize> = Some(1);
+	const ENCODED_MIN_BOUND: Option<usize> = Some(1);
 
 	fn decode<I: Input>(input: &mut I) -> Result<Self, Error> {
 		let byte = input.read_byte()?;
@@ -1708,6 +1799,8 @@ impl Encode for Duration {
 
 impl Decode for Duration {
 	const ENCODED_FIXED_SIZE: Option<usize> = <(u64, u32)>::ENCODED_FIXED_SIZE;
+	const ENCODED_MAX_BOUND: Option<usize> = <(u64, u32)>::ENCODED_MAX_BOUND;
+	const ENCODED_MIN_BOUND: Option<usize> = <(u64, u32)>::ENCODED_MIN_BOUND;
 
 	fn decode<I: Input>(input: &mut I) -> Result<Self, Error> {
 		let (secs, nanos) = <(u64, u32)>::decode(input)
@@ -1743,6 +1836,10 @@ where
 {
 	const ENCODED_FIXED_SIZE: Option<usize> =
 		if let Some(s) = T::ENCODED_FIXED_SIZE { Some(s * 2) } else { None };
+	const ENCODED_MAX_BOUND: Option<usize> =
+		if let Some(m) = T::ENCODED_MAX_BOUND { Some(m * 2) } else { None };
+	const ENCODED_MIN_BOUND: Option<usize> =
+		if let Some(m) = T::ENCODED_MIN_BOUND { Some(m * 2) } else { None };
 
 	fn decode<I: Input>(input: &mut I) -> Result<Self, Error> {
 		let (start, end) =
@@ -1772,6 +1869,10 @@ where
 {
 	const ENCODED_FIXED_SIZE: Option<usize> =
 		if let Some(s) = T::ENCODED_FIXED_SIZE { Some(s * 2) } else { None };
+	const ENCODED_MAX_BOUND: Option<usize> =
+		if let Some(m) = T::ENCODED_MAX_BOUND { Some(m * 2) } else { None };
+	const ENCODED_MIN_BOUND: Option<usize> =
+		if let Some(m) = T::ENCODED_MIN_BOUND { Some(m * 2) } else { None };
 
 	fn decode<I: Input>(input: &mut I) -> Result<Self, Error> {
 		let (start, end) =
@@ -2290,6 +2391,8 @@ mod tests {
 	#[test]
 	fn fixed_encode_sizes() {
 		assert!(u32::ENCODED_FIXED_SIZE == Some(4));
+		assert!(u32::ENCODED_MIN_BOUND == Some(4));
+		assert!(u32::ENCODED_MAX_BOUND == Some(4));
 		assert!(<[u32; 5]>::ENCODED_FIXED_SIZE == Some(4 * 5));
 	}
 }

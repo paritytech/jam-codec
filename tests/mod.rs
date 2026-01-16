@@ -756,6 +756,8 @@ fn zero_sized_types_are_properly_decoded_in_a_transparent_boxed_struct() {
 
 	impl Decode for ConsumeByte {
 		const ENCODED_FIXED_SIZE: Option<usize> = Some(1);
+		const ENCODED_MAX_BOUND: Option<usize> = Some(1);
+		const ENCODED_MIN_BOUND: Option<usize> = Some(1);
 
 		fn decode<I: jam_codec::Input>(input: &mut I) -> Result<Self, Error> {
 			let mut buffer = [0; 1];
@@ -835,6 +837,8 @@ fn incomplete_decoding_of_an_array_drops_partially_read_elements_if_reading_pani
 
 	impl Decode for Foobar {
 		const ENCODED_FIXED_SIZE: Option<usize> = Some(1);
+		const ENCODED_MAX_BOUND: Option<usize> = Some(1);
+		const ENCODED_MIN_BOUND: Option<usize> = Some(1);
 
 		fn decode<I: jam_codec::Input>(input: &mut I) -> Result<Self, Error> {
 			let mut buffer = [0; 1];
