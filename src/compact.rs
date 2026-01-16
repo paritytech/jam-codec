@@ -422,7 +422,6 @@ impl CompactLen<u128> for Compact<u128> {
 }
 
 impl Decode for Compact<()> {
-	const ENCODED_FIXED_SIZE: Option<usize> = Some(0);
 	const ENCODED_MAX_BOUND: Option<usize> = Some(0);
 	const ENCODED_MIN_BOUND: Option<usize> = Some(0);
 

@@ -309,11 +309,11 @@ pub trait Decode: Sized {
 		if let Some(max) = Self::ENCODED_MAX_BOUND {
 			if let Some(min) = Self::ENCODED_MIN_BOUND {
 				if max == min {
-					break Some(max)
+					break Some(max);
 				}
 			}
-			break None
 		}
+		break None;
 	};
 
 	/// The maximum fixed encoded size of the type.
@@ -771,7 +771,6 @@ impl Encode for OptionBool {
 impl EncodeLike for OptionBool {}
 
 impl Decode for OptionBool {
-	const ENCODED_FIXED_SIZE: Option<usize> = Some(1);
 	const ENCODED_MAX_BOUND: Option<usize> = Some(1);
 	const ENCODED_MIN_BOUND: Option<usize> = Some(1);
 
@@ -1128,7 +1127,6 @@ impl<T> Encode for PhantomData<T> {
 }
 
 impl<T> Decode for PhantomData<T> {
-	const ENCODED_FIXED_SIZE: Option<usize> = Some(0);
 	const ENCODED_MAX_BOUND: Option<usize> = Some(0);
 	const ENCODED_MIN_BOUND: Option<usize> = Some(0);
 
@@ -1140,7 +1138,6 @@ impl<T> Decode for PhantomData<T> {
 impl<T> DecodeWithMemTracking for PhantomData<T> where PhantomData<T>: Decode {}
 
 impl Decode for String {
-	const ENCODED_FIXED_SIZE: Option<usize> = None;
 	const ENCODED_MAX_BOUND: Option<usize> = None;
 	const ENCODED_MIN_BOUND: Option<usize> = Some(1);
 
@@ -1289,7 +1286,6 @@ impl<T: EncodeLike<U>, U: Encode> EncodeLike<&[U]> for Vec<T> {}
 impl<T: EncodeLike<U>, U: Encode> EncodeLike<Vec<U>> for &[T] {}
 
 impl<T: Decode> Decode for Vec<T> {
-	const ENCODED_FIXED_SIZE: Option<usize> = None;
 	const ENCODED_MAX_BOUND: Option<usize> = None;
 	const ENCODED_MIN_BOUND: Option<usize> = Some(1);
 
@@ -1337,10 +1333,8 @@ impl_encode_for_collection! {
 }
 
 impl<K: Decode + Ord, V: Decode> Decode for BTreeMap<K, V> {
-	const ENCODED_FIXED_SIZE: Option<usize> = None;
 	const ENCODED_MAX_BOUND: Option<usize> = None;
 	const ENCODED_MIN_BOUND: Option<usize> = Some(1);
-
 
 	fn decode<I: Input>(input: &mut I) -> Result<Self, Error> {
 		<Compact<u32>>::decode(input).and_then(move |Compact(len)| {
@@ -1364,7 +1358,6 @@ impl_encode_for_collection! {
 }
 
 impl<T: Decode + Ord> Decode for BTreeSet<T> {
-	const ENCODED_FIXED_SIZE: Option<usize> = None;
 	const ENCODED_MAX_BOUND: Option<usize> = None;
 	const ENCODED_MIN_BOUND: Option<usize> = Some(1);
 
@@ -1386,7 +1379,6 @@ impl_encode_for_collection! {
 }
 
 impl<T: Decode> Decode for LinkedList<T> {
-	const ENCODED_FIXED_SIZE: Option<usize> = None;
 	const ENCODED_MAX_BOUND: Option<usize> = None;
 	const ENCODED_MIN_BOUND: Option<usize> = Some(1);
 
@@ -1417,7 +1409,7 @@ impl_encode_for_collection! {
 impl<T: Decode + Ord> Decode for BinaryHeap<T> {
 	const ENCODED_FIXED_SIZE: Option<usize> = <Vec<T>>::ENCODED_FIXED_SIZE;
 	const ENCODED_MAX_BOUND: Option<usize> = <Vec<T>>::ENCODED_MAX_BOUND;
-	const ENCODED_MIN_BOUND: Option<usize> =  <Vec<T>>::ENCODED_MIN_BOUND;
+	const ENCODED_MIN_BOUND: Option<usize> = <Vec<T>>::ENCODED_MIN_BOUND;
 
 	fn decode<I: Input>(input: &mut I) -> Result<Self, Error> {
 		Ok(Vec::decode(input)?.into())
@@ -1448,7 +1440,7 @@ impl<T: Encode> Encode for VecDeque<T> {
 impl<T: Decode> Decode for VecDeque<T> {
 	const ENCODED_FIXED_SIZE: Option<usize> = <Vec<T>>::ENCODED_FIXED_SIZE;
 	const ENCODED_MAX_BOUND: Option<usize> = <Vec<T>>::ENCODED_MAX_BOUND;
-	const ENCODED_MIN_BOUND: Option<usize> =  <Vec<T>>::ENCODED_MIN_BOUND;
+	const ENCODED_MIN_BOUND: Option<usize> = <Vec<T>>::ENCODED_MIN_BOUND;
 
 	fn decode<I: Input>(input: &mut I) -> Result<Self, Error> {
 		Ok(<Vec<T>>::decode(input)?.into())
@@ -1472,7 +1464,6 @@ impl Encode for () {
 }
 
 impl Decode for () {
-	const ENCODED_FIXED_SIZE: Option<usize> = Some(0);
 	const ENCODED_MAX_BOUND: Option<usize> = Some(0);
 	const ENCODED_MIN_BOUND: Option<usize> = Some(0);
 
@@ -1704,7 +1695,6 @@ macro_rules! impl_endians {
 		impl Decode for $t {
 			const TYPE_INFO: TypeInfo = TypeInfo::$ty_info;
 
-			const ENCODED_FIXED_SIZE: Option<usize> = Some(mem::size_of::<$t>());
 			const ENCODED_MIN_BOUND: Option<usize> = Some(mem::size_of::<$t>());
 			const ENCODED_MAX_BOUND: Option<usize> = Some(mem::size_of::<$t>());
 
@@ -1738,7 +1728,6 @@ macro_rules! impl_one_byte {
 		impl Decode for $t {
 			const TYPE_INFO: TypeInfo = TypeInfo::$ty_info;
 
-			const ENCODED_FIXED_SIZE: Option<usize> = Some(mem::size_of::<$t>());
 			const ENCODED_MIN_BOUND: Option<usize> = Some(mem::size_of::<$t>());
 			const ENCODED_MAX_BOUND: Option<usize> = Some(mem::size_of::<$t>());
 
@@ -1769,7 +1758,6 @@ impl Encode for bool {
 }
 
 impl Decode for bool {
-	const ENCODED_FIXED_SIZE: Option<usize> = Some(1);
 	const ENCODED_MAX_BOUND: Option<usize> = Some(1);
 	const ENCODED_MIN_BOUND: Option<usize> = Some(1);
 
@@ -1798,7 +1786,6 @@ impl Encode for Duration {
 }
 
 impl Decode for Duration {
-	const ENCODED_FIXED_SIZE: Option<usize> = <(u64, u32)>::ENCODED_FIXED_SIZE;
 	const ENCODED_MAX_BOUND: Option<usize> = <(u64, u32)>::ENCODED_MAX_BOUND;
 	const ENCODED_MIN_BOUND: Option<usize> = <(u64, u32)>::ENCODED_MIN_BOUND;
 

@@ -52,7 +52,6 @@ impl<O: BitOrder, T: BitStore + Encode> EncodeLike for BitVec<T, O> {}
 const ARCH32BIT_BITSLICE_MAX_BITS: usize = 0x1fff_ffff;
 
 impl<O: BitOrder, T: BitStore + Decode> Decode for BitVec<T, O> {
-	const ENCODED_FIXED_SIZE: Option<usize> = None;
 	const ENCODED_MAX_BOUND: Option<usize> = None;
 	const ENCODED_MIN_BOUND: Option<usize> = Some(1);
 
