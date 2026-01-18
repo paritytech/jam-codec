@@ -309,11 +309,11 @@ pub trait Decode: Sized {
 		if let Some(max) = Self::ENCODED_MAX_BOUND {
 			if let Some(min) = Self::ENCODED_MIN_BOUND {
 				if max == min {
-					break Some(max);
+					break Some(max)
 				}
 			}
 		}
-		break None;
+		break None
 	};
 
 	/// The maximum fixed encoded size of the type.
@@ -502,6 +502,8 @@ where
 
 #[cfg(feature = "bytes")]
 impl Decode for bytes::Bytes {
+	const ENCODED_MAX_BOUND: Option<usize> = None;
+	const ENCODED_MIN_BOUND: Option<usize> = Compact::<u32>::ENCODED_MIN_BOUND;
 	fn decode<I: Input>(input: &mut I) -> Result<Self, Error> {
 		input.scale_internal_decode_bytes()
 	}
