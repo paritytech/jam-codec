@@ -296,7 +296,7 @@ where
 	T: Copy + TryFrom<u64>,
 {
 	const ENCODED_FIXED_SIZE: Option<usize> =
-		if std::mem::size_of::<T>() == 0 { Some(1) } else { None };
+		if core::mem::size_of::<T>() == 0 { Some(1) } else { None };
 	// TODO
 	const ENCODED_MAX_BOUND: Option<usize> = Self::ENCODED_FIXED_SIZE;
 	// TODO
