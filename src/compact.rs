@@ -242,19 +242,17 @@ impl Encode for CompactRef<'_, ()> {
 
 struct WrappedPrimitive<T>(T);
 
+#[inline(always)]
+fn compact_extra_bytes(x: u64) -> usize {
+	(0..8).find(|&l| x < 1 << (7 * (l + 1))).unwrap_or(8)
+}
+
 impl<T> CompactLen<T> for WrappedPrimitive<T>
 where
 	T: Copy + Into<u64>,
 {
 	fn compact_len(val: &T) -> usize {
-		let x = (*val).into();
-		1 + if x == 0 {
-			0
-		} else {
-			(0..8)
-				.find(|l| 2_u64.pow(7 * l) <= x && x < 2_u64.pow(7 * (l + 1)))
-				.unwrap_or(8)
-		} as usize
+		1 + compact_extra_bytes((*val).into())
 	}
 }
 
@@ -268,16 +266,10 @@ where
 
 	fn encode_to<W: Output + ?Sized>(&self, dest: &mut W) {
 		let x = self.0.into();
-		if x == 0 {
-			dest.push_byte(0);
-		} else if let Some(l) = (0..8).find(|l| 2_u64.pow(7 * l) <= x && x < 2_u64.pow(7 * (l + 1)))
-		{
-			dest.push_byte((2_u64.pow(8) - 2_u64.pow(8 - l) + (x / 2_u64.pow(8 * l))) as u8);
-			dest.write(&(x % 2_u64.pow(8 * l)).to_le_bytes()[..l as usize]);
-		} else {
-			dest.push_byte((2_u64.pow(8) - 1) as u8);
-			dest.write(&x.to_le_bytes());
-		}
+		let l = compact_extra_bytes(x);
+		let prefix = if l == 8 { 0xff } else { !(0xff >> l) | (x >> (8 * l)) as u8 };
+		dest.push_byte(prefix);
+		dest.write(&x.to_le_bytes()[..l]);
 	}
 
 	fn using_encoded<R, F: FnOnce(&[u8]) -> R>(&self, f: F) -> R {
@@ -292,24 +284,16 @@ where
 	T: Copy + TryFrom<u64>,
 {
 	fn decode<I: Input>(input: &mut I) -> Result<Self, Error> {
-		const OUT_OF_RANGE: &str = "Out of range";
-		const NON_CANONICAL: &str = "Non-canonical compact encoding";
-		let (v, extra_bytes) = match input.read_byte()? {
-			0 => (0, 0),
-			0xff => (u64::decode(input)?, 8),
-			b => {
-				let l = b.leading_ones() as usize;
-				let mut buf = [0u8; 8];
-				input.read(&mut buf[..l])?;
-				let rem = (b & ((1 << (7 - l)) - 1)) as u64;
-				(u64::from_le_bytes(buf) + (rem << (8 * l)), l)
-			},
-		};
-		if WrappedPrimitive::<u64>::compact_len(&v) != 1 + extra_bytes {
-			return Err(NON_CANONICAL.into());
+		let prefix = input.read_byte()?;
+		let l = prefix.leading_ones() as usize;
+		let mut buf = [0u8; 8];
+		input.read(&mut buf[..l])?;
+		let high = if l == 8 { 0 } else { u64::from(prefix & (0x7f >> l)) << (8 * l) };
+		let x = u64::from_le_bytes(buf) | high;
+		if compact_extra_bytes(x) != l {
+			return Err("Non-canonical compact encoding".into());
 		}
-		let v = T::try_from(v).map_err(|_| Error::from(OUT_OF_RANGE))?;
-		Ok(Self(v))
+		T::try_from(x).map(Self).map_err(|_| "Out of range".into())
 	}
 }
 
