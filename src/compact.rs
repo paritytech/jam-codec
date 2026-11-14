@@ -298,7 +298,7 @@ where
 			0 => (0, 0),
 			0xff => (u64::decode(input)?, 8),
 			b => {
-				let l = (0..8).find(|&i| (b & (0b1000_0000 >> i)) == 0).unwrap();
+				let l = b.leading_ones() as usize;
 				let mut buf = [0u8; 8];
 				input.read(&mut buf[..l])?;
 				let rem = (b & ((1 << (7 - l)) - 1)) as u64;
