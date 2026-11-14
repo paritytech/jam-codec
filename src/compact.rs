@@ -293,17 +293,21 @@ where
 {
 	fn decode<I: Input>(input: &mut I) -> Result<Self, Error> {
 		const OUT_OF_RANGE: &str = "Out of range";
-		let v = match input.read_byte()? {
-			0 => 0,
-			0xff => u64::decode(input)?,
+		const NON_CANONICAL: &str = "Non-canonical compact encoding";
+		let (v, extra_bytes) = match input.read_byte()? {
+			0 => (0, 0),
+			0xff => (u64::decode(input)?, 8),
 			b => {
 				let l = (0..8).find(|&i| (b & (0b1000_0000 >> i)) == 0).unwrap();
 				let mut buf = [0u8; 8];
 				input.read(&mut buf[..l])?;
 				let rem = (b & ((1 << (7 - l)) - 1)) as u64;
-				u64::from_le_bytes(buf) + (rem << (8 * l))
+				(u64::from_le_bytes(buf) + (rem << (8 * l)), l)
 			},
 		};
+		if WrappedPrimitive::<u64>::compact_len(&v) != 1 + extra_bytes {
+			return Err(NON_CANONICAL.into());
+		}
 		let v = T::try_from(v).map_err(|_| Error::from(OUT_OF_RANGE))?;
 		Ok(Self(v))
 	}
@@ -623,6 +627,28 @@ mod tests {
 				assert_eq!(<Compact<u64>>::decode(&mut &encoded[..]).unwrap().0, n);
 			}
 		}
+	}
+
+	// JAM decoding is the inverse of the encoding, which writes each value in one form only. A
+	// longer form must fail, or one value has two encodings and two hashes.
+	#[test]
+	fn compact_decode_rejects_non_canonical_encodings() {
+		for extra_bytes in 1..=8 {
+			let prefix = u8::MAX << (8 - extra_bytes);
+			let encode_with_length = |value: u64| {
+				let mut bytes = vec![prefix];
+				bytes.extend_from_slice(&value.to_le_bytes()[..extra_bytes]);
+				bytes
+			};
+			let smallest_value = 1u64 << (7 * extra_bytes);
+			for value in [0, smallest_value - 1] {
+				assert!(<Compact<u64>>::decode(&mut &encode_with_length(value)[..]).is_err());
+			}
+			let canonical = encode_with_length(smallest_value);
+			assert_eq!(canonical, Compact(smallest_value).encode());
+			assert_eq!(<Compact<u64>>::decode(&mut &canonical[..]).unwrap().0, smallest_value);
+		}
+		assert!(<Vec<u8>>::decode(&mut &[0x80, 0x00][..]).is_err());
 	}
 
 	#[cfg_attr(feature = "std", derive(Serialize, Deserialize, Debug))]
