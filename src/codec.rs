@@ -2011,8 +2011,8 @@ mod tests {
 		);
 	}
 
-	// Under miri this is the only check of the chunked decode (`unsafe { set_len }`) for items wider
-	// than one byte: CI skips the large `bit_vec` tests there because they take hours.
+	// Under miri this is the only check of the chunked decode (`unsafe { set_len }`) for items
+	// wider than one byte: CI skips the large `bit_vec` tests there because they take hours.
 	#[test]
 	fn vec_decode_crosses_preallocation_chunks() {
 		fn check<T: Encode + Decode + PartialEq + fmt::Debug + From<u16>>() {
